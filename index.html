@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sakura Checker Lite — クライアントサイド版</title>
+  <!-- head 内に -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="icon-192.png">
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
@@ -84,8 +89,21 @@
           </div>
           <div class="row" style="margin-top:10px">
             <button class="btn" id="btnExportJson">結果JSONをダウンロード</button>
+            <button class="btn" id="btnExportHtml">HTMLレポートをダウンロード</button>
+
           </div>
         </div>
+        <div class="kv">
+  <b>重み調整</b>
+  <div class="row" style="gap:12px;flex-wrap:wrap">
+    <label>星評価 <input type="range" id="w_rating" min="0" max="40" value="22"></label>
+    <label>集中度 <input type="range" id="w_burst"  min="0" max="40" value="22"></label>
+    <label>類似度 <input type="range" id="w_text"   min="0" max="40" value="20"></label>
+    <label>定型句 <input type="range" id="w_phrase" min="0" max="40" value="18"></label>
+    <label>行動   <input type="range" id="w_user"   min="0" max="40" value="18"></label>
+    <button class="btn" id="btnRecalc">重みで再計算</button>
+  </div>
+</div>
       </div>
     </div>
 
@@ -111,6 +129,8 @@
 
     <div class="foot">※ 本ツールは学習・検証用です。取得や利用は各サービスの規約に従ってください。</div>
   </div>
+
+
 
 <script>
 // ====== ユーティリティ ======
@@ -228,6 +248,35 @@ function aggregateScores(scores, weights){
   weights = weights || { rating_skew:0.22, burstiness:0.22, text_similarity:0.20, phrase_flags:0.18, reviewer_behavior:0.18 };
   let total = 0; for(const k in weights){ total += (scores[k].score||0) * weights[k]; }
   return { total_score: clamp(total), weights };
+function currentWeights(){
+  const sum = (a,b,c,d,e)=>a+b+c+d+e;
+  let w1 = Number(document.getElementById('w_rating')?.value ?? 22);
+  let w2 = Number(document.getElementById('w_burst') ?.value ?? 22);
+  let w3 = Number(document.getElementById('w_text')  ?.value ?? 20);
+  let w4 = Number(document.getElementById('w_phrase')?.value ?? 18);
+  let w5 = Number(document.getElementById('w_user')  ?.value ?? 18);
+  const s = sum(w1,w2,w3,w4,w5) || 1;
+  // 合計100に正規化
+  w1 = w1/s; w2 = w2/s; w3 = w3/s; w4 = w4/s; w5 = w5/s;
+  return {
+    rating_skew: w1, burstiness: w2, text_similarity: w3,
+    phrase_flags: w4, reviewer_behavior: w5
+  };
+}
+
+function analyzeRows(rows){
+  // ... scores の計算は今のまま
+  const scores = { /* 省略：既存のs1～s5 */ };
+  const agg = aggregateScores(scores, currentWeights());
+  // 以降は既存の summary/render を再利用
+}
+
+document.getElementById('btnRecalc')?.addEventListener('click', ()=>{
+  if(!window.__lastRows){ alert('先に解析してください'); return; }
+  analyzeRows(window.__lastRows);
+});
+
+
 }
 
 // ====== 描画 ======
@@ -416,5 +465,19 @@ userS2,5,2025-07-07,無料提供で試しましたが最高！神コスパ！
 userS3,5,2025-07-07,最高です！神コスパ！友人にも勧めます！！
 userS4,5,2025-07-07,届いてすぐ使いました。最高です！神コスパ！`;
 </script>
+
+<!-- body 終了前に（既存<script>の最後でOK） -->
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js");
+  }
+</script>
+<!-- bodyのどこかに -->
+<small>最終更新: <span id="lastUpdated"></span></small>
+<script>
+  document.getElementById('lastUpdated').textContent =
+    new Date(document.lastModified).toLocaleString();
+</script>
+
 </body>
 </html>
