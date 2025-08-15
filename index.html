@@ -31,13 +31,13 @@
 <div class="card">
   <h1>給料計算ツール</h1>
 
-  <!-- 勤務日数プルダウン -->
+  <!-- 勤務日数プルダウン（「日」を表示しない） -->
   <div class="control-block">
     <label for="daysSelect">勤務日数:</label>
     <select id="daysSelect"></select>
   </div>
 
-  <!-- 勤務時間プルダウン（新規追加） -->
+  <!-- 勤務時間プルダウン（1〜24） -->
   <div class="control-block">
     <label for="hoursSelect">勤務時間（時間/日）:</label>
     <select id="hoursSelect"></select>
@@ -84,10 +84,10 @@
 <script>
 /* ====== 設定・状態 ====== */
 const WAGE=1300;                              // 時給（固定）
-const STORAGE_MONTHS='salaryMonths_v7';       // { [m]: {amount, days} }（※金額と日数を保存）
-const STORAGE_STATE ='salaryState_v5';        // { days, hours, extraMoney, step }
+const STORAGE_MONTHS='salaryMonths_v7';       // { [m]: {amount, days} }
+const STORAGE_STATE ='salaryState_v6';        // { days, hours, extraMoney, step }
 
-let days=0, hours=8, extraMoney=0, step=1300; // 初期hoursは8にしておきます（自由に変更可）
+let days=0, hours=8, extraMoney=0, step=1300;
 let months={}; 
 
 /* ====== ユーティリティ ====== */
@@ -108,6 +108,22 @@ function render(){
 function getStep(){ step=Number(document.getElementById('stepSelect').value)||1300; saveState(); return step; }
 function addMoneyByStep(){ extraMoney+=getStep(); saveState(); render(); }
 function removeMoneyByStep(){ extraMoney=Math.max(0,extraMoney-getStep()); saveState(); render(); }
+
+/* ====== リセット（完全初期化） ====== */
+function resetData(){
+  days = 0;
+  hours = 8;        // 初期値
+  extraMoney = 0;
+  step = 1300;
+
+  // UI反映
+  document.getElementById('daysSelect').value = '0';
+  document.getElementById('hoursSelect').value = '8';
+  document.getElementById('stepSelect').value  = '1300';
+
+  saveState();
+  render();
+}
 
 /* ====== 月保存（選択中の金額＋日数） ====== */
 function saveToSelectedMonth(){
@@ -188,7 +204,7 @@ function exportCSV(){
 /* ====== 初期化 ====== */
 function buildDaysOptions(){
   const sel=document.getElementById('daysSelect'); sel.innerHTML='';
-  for(let i=0;i<=365;i++){ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=i+' 日'; sel.appendChild(opt); }
+  for(let i=0;i<=365;i++){ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=String(i); sel.appendChild(opt); }
   sel.addEventListener('change',()=>{ days=Number(sel.value); saveState(); render(); });
 }
 function buildHoursOptions(){
