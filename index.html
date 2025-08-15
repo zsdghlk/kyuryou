@@ -1,483 +1,329 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sakura Checker Lite — クライアントサイド版</title>
-  <!-- head 内に -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f172a">
-<link rel="icon" href="icon-192.png">
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <style>
-    :root{
-      --bg:#0f172a; --panel:#111827; --panel2:#0b1222; --text:#e5e7eb; --muted:#9ca3af; --accent:#22c55e; --warn:#f59e0b; --danger:#ef4444;
-      --border:#1f2937; --chip:#0b1020; --chip2:#0e1730;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:radial-gradient(900px 600px at 20% -10%, #172554 0%, transparent 60%), var(--bg);color:var(--text);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",Helvetica,Arial; line-height:1.45;}
-    .container{max-width:1100px;margin:0 auto;padding:16px}
-    h1{font-size:clamp(20px,3vw,28px);margin:0 0 8px}
-    .sub{color:var(--muted);margin-bottom:16px}
-    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
-    @media (max-width:960px){.grid{grid-template-columns:1fr}}
-    .card{background:linear-gradient(0deg, var(--panel) 0%, var(--panel2) 100%); border:1px solid var(--border); border-radius:16px; padding:14px}
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .btn{appearance:none;border:1px solid var(--border);background:var(--chip);color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer}
-    .btn:hover{background:var(--chip2)}
-    input[type=file]{display:block;width:100%;padding:10px;border:1px dashed var(--border);border-radius:12px;background:#0a0f1f}
-    textarea{width:100%;min-height:160px;border-radius:12px;border:1px solid var(--border);background:#0a0f1f;color:var(--text);padding:10px}
-    .kvs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
-    .kv{background:#0b1120;border:1px solid var(--border);padding:12px;border-radius:12px}
-    .kv b{display:block;font-size:12px;color:var(--muted)}
-    .score-badge{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);font-weight:600}
-    .score-ok{background:#0c1a12;border-color:#13361f;color:#86efac}
-    .score-warn{background:#1d1607;border-color:#3a2b10;color:#fcd34d}
-    .score-bad{background:#2a0f12;border-color:#4b151a;color:#fca5a5}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
-    th{color:var(--muted);font-weight:600}
-    .muted{color:var(--muted)}
-    .chart-wrap{background:#0b1120;border:1px solid var(--border);padding:10px;border-radius:12px}
-    .foot{margin-top:10px;color:var(--muted);font-size:12px}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#111827;border:1px solid var(--border);font-size:12px;color:#cbd5e1}
-  </style>
+<meta charset="UTF-8" />
+<title>給料計算ツール</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<style>
+  :root{
+    --card-max: 760px; --gap: 12px; --radius: 14px; --bg: #f2f5f9;
+    --c-plus:#2563eb; --c-minus:#0ea5e9; --c-reset:#dc2626; --c-save:#059669; --c-export:#7c3aed; --ink:#0b1020;
+  }
+  *{ box-sizing:border-box }
+  html{ -webkit-text-size-adjust:100% }
+  body{
+    margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+    background:var(--bg); min-height:100dvh; display:grid; place-items:center;
+  }
+  .card{
+    width:min(96vw,var(--card-max)); background:#fff; border-radius:var(--radius);
+    box-shadow:0 8px 24px rgba(0,0,0,.10); padding:clamp(14px,3.6vw,28px);
+    padding-bottom:calc(clamp(14px,3.6vw,28px) + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:clamp(12px,2.6vw,20px);
+  }
+  .title{ margin:0; text-align:center; font-weight:700; font-size:clamp(18px,5.2vw,24px) }
+  .status{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:10px 12px; background:#f7f9fc; border:1px solid #e8eef7; border-radius:12px;
+    font-size:clamp(16px,4.5vw,18px);
+  }
+  .status .value{ font-variant-numeric:tabular-nums; font-weight:700 }
+  .grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--gap) }
+  button{
+    display:inline-flex; align-items:center; justify-content:center; width:100%; min-height:44px;
+    padding:clamp(12px,3.2vw,16px); font-size:clamp(16px,4.6vw,18px); border:none; border-radius:12px; color:#fff;
+    cursor:pointer; touch-action:manipulation; transition:transform .05s ease, filter .2s ease, background .2s ease;
+  }
+  button:active{ transform:scale(.98) }
+  .plus{ background:var(--c-plus) } .minus{ background:var(--c-minus) } .reset{ background:var(--c-reset); grid-column:1/-1 }
+  .save-btn{ background:var(--c-save) } .export-btn{ background:var(--c-export) }
+  .salary{ margin-top:2px; padding:clamp(12px,3.2vw,16px); background:var(--ink); color:#fff; border-radius:12px;
+    text-align:center; font-weight:800; font-size:clamp(20px,6.2vw,28px) }
+  .save-row{ display:grid; gap:var(--gap); grid-template-columns:1fr }
+  @media (min-width:520px){ .save-row{ grid-template-columns:1fr auto } }
+  select{ width:100%; min-height:44px; padding:10px 12px; border-radius:10px; border:1px solid #dbe4f2; font-size:clamp(15px,4.5vw,16px); background:#fff }
+  .months{ border-top:1px solid #e9eef6; padding-top:clamp(12px,2.6vw,18px); display:flex; flex-direction:column; gap:10px }
+  .months h2{ margin:0; font-size:clamp(16px,4.5vw,18px); font-weight:700 }
+  .months-grid{ display:grid; gap:10px; grid-template-columns:1fr }
+  @media (min-width:420px){ .months-grid{ grid-template-columns:repeat(2,1fr) } }
+  @media (min-width:720px){ .months-grid{ grid-template-columns:repeat(3,1fr) } }
+  .month-item{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:8px; padding:10px; border:1px solid #e8eef7; border-radius:10px; background:#fbfdff; break-inside:avoid; page-break-inside:avoid }
+  .month-label{ font-weight:600; color:#334155 }
+  .month-input{ width:100%; border:none; background:transparent; text-align:right; font-size:clamp(15px,4.5vw,16px); color:#0b1220;
+    padding:6px 8px; border-radius:8px; outline:none; font-variant-numeric:tabular-nums }
+  .month-input::placeholder{ color:#94a3b8 }
+  .note{ color:#64748b; font-size:clamp(12px,3.6vw,13px) }
+  .total{ margin-top:12px; padding:clamp(12px,3.2vw,16px); background:#1e293b; color:#fff; border-radius:12px; text-align:center; font-weight:800; font-size:clamp(18px,5.5vw,24px) }
+  .export-row{ display:grid; gap:var(--gap); margin-top:2px; grid-template-columns:repeat(2,minmax(0,1fr)) }
+  @media (min-width:640px){ .export-row{ grid-template-columns:repeat(4,minmax(0,1fr)) } }
+  @media print{
+    body{ background:#fff } .card{ box-shadow:none; width:100%; max-width:none; padding:12mm; border-radius:0 }
+    .grid{ grid-template-columns:1fr 1fr } .save-row{ grid-template-columns:1fr 1fr } .months-grid{ grid-template-columns:1fr 1fr 1fr }
+    button,select{ display:none!important } .note{ color:#475569 }
+  }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Sakura Checker Lite（クライアントだけで解析）</h1>
-    <div class="sub">レビューのCSV/JSONをブラウザ内だけで解析します。データは<strong>サーバーへ送信しません</strong>。<span class="pill">デモデータあり</span></div>
+  <div class="card" id="capture-area">
+    <h1 class="title">給料計算ツール</h1>
 
-    <div class="grid">
-      <!-- 左：入力と実行 -->
-      <div class="card">
-        <h2 style="margin-top:4px">1) データを読み込む</h2>
-        <div class="row" style="margin:6px 0 10px">
-          <button class="btn" id="btnDemo">デモデータ読み込み</button>
-          <button class="btn" id="btnAnalyze">解析する</button>
-          <button class="btn" id="btnClear">クリア</button>
-        </div>
-        <label class="muted">ファイルから読み込む（CSV/JSON）</label>
-        <input type="file" id="file" accept=".csv,.json" />
-        <div style="height:10px"></div>
-        <label class="muted">または貼り付け（CSV か JSON 配列）</label>
-        <textarea id="text"></textarea>
-        <div class="foot">CSV の推奨列: <span class="mono">user_id,rating,date,text</span> ／ 日付は <span class="mono">YYYY-MM-DD</span>
-          ／ JSONは配列で同名キー。</div>
-      </div>
-
-      <!-- 右：サマリー -->
-      <div class="card">
-        <h2 style="margin-top:4px">2) 結果サマリー</h2>
-        <div id="summaryNone" class="muted">解析後にここへ表示します。</div>
-        <div id="summary" style="display:none">
-          <div class="kvs">
-            <div class="kv"><b>総合スコア</b><div id="overallScore" style="font-size:36px;font-weight:700">—</div></div>
-            <div class="kv"><b>判定</b><div id="overallLabel" class="score-badge">—</div></div>
-            <div class="kv"><b>レビュー件数</b><div id="nReviews" style="font-size:20px">—</div></div>
-            <div class="kv"><b>期間</b><div id="range" style="font-size:16px">—</div></div>
-          </div>
-          <div style="height:10px"></div>
-          <div class="kv">
-            <b>項目スコア</b>
-            <table id="compTable"><thead><tr><th>項目</th><th>スコア</th></tr></thead><tbody></tbody></table>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <button class="btn" id="btnExportJson">結果JSONをダウンロード</button>
-            <button class="btn" id="btnExportHtml">HTMLレポートをダウンロード</button>
-
-          </div>
-        </div>
-        <div class="kv">
-  <b>重み調整</b>
-  <div class="row" style="gap:12px;flex-wrap:wrap">
-    <label>星評価 <input type="range" id="w_rating" min="0" max="40" value="22"></label>
-    <label>集中度 <input type="range" id="w_burst"  min="0" max="40" value="22"></label>
-    <label>類似度 <input type="range" id="w_text"   min="0" max="40" value="20"></label>
-    <label>定型句 <input type="range" id="w_phrase" min="0" max="40" value="18"></label>
-    <label>行動   <input type="range" id="w_user"   min="0" max="40" value="18"></label>
-    <button class="btn" id="btnRecalc">重みで再計算</button>
-  </div>
-</div>
-      </div>
+    <div class="status">
+      <div>勤務日数</div>
+      <div class="value"><span id="days">0</span> 日</div>
     </div>
 
-    <div style="height:16px"></div>
-
     <div class="grid">
-      <div class="card">
-        <h2>分布と時系列</h2>
-        <div class="chart-wrap"><canvas id="chartRatings" height="160"></canvas></div>
-        <div style="height:10px"></div>
-        <div class="chart-wrap"><canvas id="chartDaily" height="160"></canvas></div>
-      </div>
-      <div class="card">
-        <h2>レビューごとの簡易フラグ</h2>
-        <div class="muted" id="flagsNone">解析後にここへ表示します（先頭50件まで）。</div>
-        <div id="flagsWrap" style="max-height:420px;overflow:auto;display:none">
-          <table id="flagsTable"><thead>
-            <tr><th>user_id</th><th>date</th><th>rating</th><th>phrase</th><th>短文</th><th>!多</th><th>text</th></tr>
-          </thead><tbody></tbody></table>
-        </div>
-      </div>
+      <button class="plus"  onclick="addDay()">＋1日</button>
+      <button class="minus" onclick="removeDay()">−1日</button>
+      <button class="plus"  onclick="addMoney()">＋1300円</button>
+      <button class="minus" onclick="removeMoney()">−1300円</button>
+      <button class="reset" onclick="resetData()">リセット</button>
     </div>
 
-    <div class="foot">※ 本ツールは学習・検証用です。取得や利用は各サービスの規約に従ってください。</div>
+    <div class="salary" id="salary">給料：0 円</div>
+
+    <div class="save-row">
+      <select id="monthSelect" aria-label="保存先の月">
+        <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+        <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+        <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+        <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+      </select>
+      <button class="save-btn" onclick="saveToSelectedMonth()">この金額を保存</button>
+    </div>
+
+    <section class="months">
+      <h2>月別データ（1月〜12月）</h2>
+      <div class="months-grid" id="monthsGrid"></div>
+      <div class="note">数字はそのまま編集・削除できます（入力すると自動保存）。</div>
+      <div class="total" id="totalYear">年間合計：0 円</div>
+    </section>
+
+    <div class="export-row">
+      <button class="export-btn" onclick="printView()">印刷 / PDF保存</button>
+      <button class="export-btn" onclick="exportCSV()">CSVダウンロード</button>
+      <button class="export-btn" onclick="exportJSON()">JSONダウンロード</button>
+      <button class="export-btn" onclick="exportPNG()">画像(PNG)保存</button>
+    </div>
   </div>
-
-
 
 <script>
-// ====== ユーティリティ ======
-const clamp = (v, lo=0, hi=100) => Math.max(lo, Math.min(hi, v));
-const toDate = s => new Date(s);
+(() => {
+  // ===== 設定 =====
+  const WAGE = 1300, BASE_HOURS = 7, EXTRA_STEP = 1300, STORAGE_KEY = 'salaryData_v4';
+  let days = 0, extraMoney = 0, months = {};
 
-function jaccardCharNgrams(a, b, n=2){
-  const grams = s => {
-    s = (s||"").replace(/\s+/g, "");
-    const out = new Set();
-    for(let i=0;i<Math.max(0, s.length-n+1);i++) out.add(s.slice(i,i+n));
-    return out;
-  };
-  const A = grams(a), B = grams(b);
-  if(A.size===0 && B.size===0) return 1;
-  if(A.size===0 || B.size===0) return 0;
-  let inter=0; A.forEach(x=>{ if(B.has(x)) inter++; });
-  return inter / (A.size + B.size - inter);
-}
+  // ===== ユーティリティ =====
+  const fmtJPY = n => Number(n||0).toLocaleString() + ' 円';
+  const onlyDigits = s => (s||'').replace(/[^\d]/g, '');
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-function labelFromScore(s){
-  if(s < 30) return {text:'合格', cls:'score-ok'};
-  if(s < 60) return {text:'注意', cls:'score-warn'};
-  return {text:'危険', cls:'score-bad'};
-}
+  function currentTotal(){ return (WAGE * BASE_HOURS * days) + extraMoney; }
 
-// ====== スコア計算 ======
-function scoreRatingSkew(rows){
-  const counts = {1:0,2:0,3:0,4:0,5:0};
-  rows.forEach(r=>{ const k = Number(r.rating)||0; if(counts[k]!=null) counts[k]++; });
-  const n = rows.length;
-  const p5 = n? counts[5]/n : 0;
-  const p1 = n? counts[1]/n : 0;
-  const avg = n? (rows.reduce((s,r)=>s+(Number(r.rating)||0),0)/n) : 0;
-  let score = 0;
-  score += clamp((p5 - 0.60) / 0.40 * 100);
-  if(avg>4.0){ score += clamp(((avg - 4.0) / 0.6) * 50); }
-  score -= p1 * 30;
-  score = clamp(score);
-  return {score, detail:{p5, p1, avg, counts}};
-}
+  // ===== 表示更新 =====
+  function render(){
+    document.getElementById('days').textContent = days;
+    document.getElementById('salary').textContent = '給料：' + fmtJPY(currentTotal());
+  }
 
-function scoreBurstiness(rows){
-  const daily = {};
-  rows.forEach(r=>{ const d=r.date; daily[d]=(daily[d]||0)+1; });
-  const sorted = Object.entries(daily).sort((a,b)=>b[1]-a[1]);
-  const n = rows.length;
-  const top3 = sorted.slice(0,3).reduce((s,kv)=>s+kv[1],0);
-  const top3_share = n? top3 / n : 0;
-  const score = clamp((top3_share - 0.30)/0.40 * 100);
-  const dailyObj = Object.fromEntries(sorted);
-  return {score, detail:{top3_share, daily: dailyObj}};
-}
+  // ===== 操作 =====
+  function addDay(){ days++; render(); }
+  function removeDay(){ if(days>0) days--; render(); }
+  function addMoney(){ extraMoney += EXTRA_STEP; render(); }
+  function removeMoney(){ if(extraMoney>=EXTRA_STEP) extraMoney -= EXTRA_STEP; render(); }
+  function resetData(){ days = 0; extraMoney = 0; render(); }
 
-function scoreTextSimilarity(rows, threshold=0.85){
-  const texts = rows.map(r=> String(r.text||""));
-  const n = texts.length; if(n<=1) return {score:0, detail:{ratio_high_sim:0,high_sim:0,total_pairs:0}};
-  let total=0, high=0;
-  for(let i=0;i<n;i++){
-    for(let j=i+1;j<n;j++){
-      total++;
-      const sim = jaccardCharNgrams(texts[i], texts[j], 2);
-      if(sim>=threshold) high++;
+  // ===== 月保存 =====
+  function saveToSelectedMonth(){
+    const sel = document.getElementById('monthSelect').value;
+    months[sel] = currentTotal();
+    saveMonths(); buildMonthsGrid();
+  }
+
+  // ===== 月一覧UI =====
+  function buildMonthsGrid(){
+    const grid = document.getElementById('monthsGrid');
+    grid.innerHTML = '';
+    let totalYear = 0;
+    for(let m=1;m<=12;m++){
+      const wrap = document.createElement('div'); wrap.className = 'month-item';
+      const label = document.createElement('div'); label.className = 'month-label'; label.textContent = `${m}月`;
+      const input = document.createElement('input');
+      input.className = 'month-input'; input.setAttribute('data-month', m);
+      input.setAttribute('placeholder','0'); input.setAttribute('inputmode','numeric'); input.setAttribute('aria-label', `${m}月の保存金額`);
+      const val = months[m]||0; input.value = val ? Number(val).toLocaleString() : '';
+      totalYear += months[m]||0;
+
+      input.addEventListener('input', (e)=>{
+        const raw = onlyDigits(e.target.value);
+        e.target.value = raw;
+        months[m] = raw===''?0:Number(raw);
+        saveMonths(); updateTotal();
+      });
+      input.addEventListener('blur', (e)=>{
+        const raw = onlyDigits(e.target.value);
+        e.target.value = raw?Number(raw).toLocaleString():'';
+      });
+      input.addEventListener('focus', (e)=>{
+        const raw = onlyDigits(e.target.value);
+        e.target.value = raw;
+        setTimeout(()=>{ const len=e.target.value.length; e.target.setSelectionRange(len,len); },0);
+      });
+
+      wrap.appendChild(label); wrap.appendChild(input); grid.appendChild(wrap);
+    }
+    document.getElementById('totalYear').textContent = '年間合計：' + fmtJPY(totalYear);
+  }
+
+  function updateTotal(){
+    let sum=0; for(let m=1;m<=12;m++){ sum+=(months[m]||0); }
+    document.getElementById('totalYear').textContent = '年間合計：' + fmtJPY(sum);
+  }
+
+  // ===== 保存／読込 =====
+  function saveMonths(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(months)); }
+  function loadMonths(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const obj = raw?JSON.parse(raw):{};
+      months={}; for(let m=1;m<=12;m++){ months[m]=Number(obj[m]||0); }
+    }catch(_){
+      months={}; for(let m=1;m<=12;m++) months[m]=0;
     }
   }
-  const ratio = total? high/total : 0;
-  const score = clamp((ratio - 0.05) / (0.30 - 0.05) * 100);
-  return {score, detail:{ratio_high_sim:ratio, high_sim:high, total_pairs:total}};
-}
 
-function scorePhraseFlags(rows){
-  const flags = [
-    /神コスパ/g, /最高/g, /超おすすめ/g, /星5/g, /五つ星/g,
-    /提供/g, /無料提供/g, /PR/g, /割引コード/g, /クーポン/g,
-    /届いてすぐ/g, /リピ確定/g, /感動/g, /奇跡/g, /神(?!コスパ)/g
-  ];
-  const re = new RegExp(flags.map(f=>f.source).join("|"));
-  let hit=0; rows.forEach(r=>{ if(re.test(String(r.text||""))) hit++; });
-  const ratio = rows.length? hit/rows.length : 0;
-  const score = clamp((ratio/0.40)*100);
-  return {score, detail:{hit, ratio, flags: flags.map(f=>f.source)}};
-}
+  // ===== エクスポート（PDF/CSV/JSON） =====
+  function printView(){ window.print(); }
 
-function scoreReviewerBehavior(rows){
-  const n = rows.length;
-  // group by user
-  const byUser = new Map();
-  rows.forEach(r=>{
-    const arr = byUser.get(r.user_id) || []; arr.push(r); byUser.set(r.user_id, arr);
-  });
-  const suspiciousUsers = new Set();
-  for(const [uid, arr] of byUser){
-    arr.sort((a,b)=> new Date(a.date) - new Date(b.date));
-    for(let i=1;i<arr.length;i++){
-      const gap = Math.abs((new Date(arr[i].date) - new Date(arr[i-1].date)) / 86400000);
-      if(gap<=1 && Number(arr[i].rating)==5 && Number(arr[i-1].rating)==5){
-        suspiciousUsers.add(uid);
+  function exportCSV(){
+    let rows = [];
+    rows.push(['項目','値']);
+    rows.push(['時給', WAGE]);
+    rows.push(['基本勤務時間(時間/日)', BASE_HOURS]);
+    rows.push(['現在の勤務日数', days]);
+    rows.push(['現在の追加金額', extraMoney]);
+    rows.push(['現在表示の給料', currentTotal()]);
+    rows.push([]);
+    rows.push(['月','金額']);
+    let sum=0;
+    for(let m=1;m<=12;m++){ const v=months[m]||0; rows.push([`${m}`, v]); sum+=v; }
+    rows.push([]);
+    rows.push(['年間合計', sum]);
+
+    const csv = rows.map(r => r.map(x=>{
+      const s = String(x ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    }).join(',')).join('\n');
+
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `salary_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function exportJSON(){
+    const data = {
+      wage: WAGE, baseHours: BASE_HOURS, days, extraMoney,
+      currentTotal: currentTotal(), months,
+      totalYear: Object.values(months).reduce((a,b)=>a+(b||0),0),
+      generatedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `salary_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  // ===== 画像(PNG) — オフライン対応（SVG + foreignObject方式） =====
+  function inlineComputedStyles(node){
+    const win = node.ownerDocument.defaultView;
+    const styles = win.getComputedStyle(node);
+    const cssText = Array.from(styles).map(p => `${p}:${styles.getPropertyValue(p)}`).join(';');
+    node.setAttribute('style', cssText);
+
+    for (const child of node.children) inlineComputedStyles(child);
+  }
+
+  function exportPNG(){
+    const el = document.getElementById('capture-area');
+    const rect = el.getBoundingClientRect();
+    const width = Math.ceil(rect.width);
+    const height = Math.ceil(rect.height);
+
+    // クローンしてスタイルをインライン化（外部CSS不要に）
+    const clone = el.cloneNode(true);
+    inlineComputedStyles(clone);
+
+    // XHTMLシリアライズ
+    const xhtml = new XMLSerializer().serializeToString(clone);
+
+    // SVG＋foreignObjectでDOMを描画
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <foreignObject x="0" y="0" width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml">${xhtml}</div>
+        </foreignObject>
+      </svg>`.trim();
+
+    const svgBlob = new Blob([svg], {type: 'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = width * (window.devicePixelRatio || 1);
+      canvas.height = height * (window.devicePixelRatio || 1);
+      const ctx = canvas.getContext('2d');
+      ctx.scale((window.devicePixelRatio || 1), (window.devicePixelRatio || 1));
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const dataURL = canvas.toDataURL('image/png');
+
+      // iOS/Safariは新規タブで開く
+      if (isIOS || isSafari) {
+        const w = window.open();
+        if (w) {
+          w.document.write('<html><head><title>salary.png</title></head><body style="margin:0"><img src="'+dataURL+'" style="width:100%;height:auto"/></body></html>');
+          w.document.close();
+        } else {
+          const a = document.createElement('a'); a.href = dataURL; a.target = '_blank'; document.body.appendChild(a); a.click(); a.remove();
+        }
+      } else {
+        const a = document.createElement('a');
+        a.href = dataURL;
+        a.download = `salary_${new Date().toISOString().slice(0,10)}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
       }
-    }
+    };
+    img.onerror = () => {
+      alert('画像変換に失敗しました。お手数ですが「印刷 / PDF保存」をご利用ください。');
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
   }
-  const uniqUsers = byUser.size || 1;
-  const ratio_users = suspiciousUsers.size / uniqUsers;
 
-  const daily = {};
-  rows.forEach(r=>{ const d=r.date; daily[d]=(daily[d]||0)+1; });
-  const top_day_share = n? Math.max(...Object.values(daily))/n : 0;
+  // ===== 初期化 =====
+  (function init(){
+    document.getElementById('monthSelect').value = String(new Date().getMonth()+1);
+    loadMonths(); buildMonthsGrid(); render();
+  })();
 
-  const score_users = clamp((ratio_users - 0.10) / (0.60 - 0.10) * 100);
-  const score_topday = clamp((top_day_share - 0.25) / (0.60 - 0.25) * 100);
-  const score = clamp(0.6*score_topday + 0.4*score_users);
-  return {score, detail:{suspicious_users:[...suspiciousUsers], ratio_users, top_day_share}};
-}
+  // iOS ピンチズーム抑止（補助）
+  document.addEventListener('gesturestart', e => e.preventDefault(), {passive:false});
 
-function aggregateScores(scores, weights){
-  weights = weights || { rating_skew:0.22, burstiness:0.22, text_similarity:0.20, phrase_flags:0.18, reviewer_behavior:0.18 };
-  let total = 0; for(const k in weights){ total += (scores[k].score||0) * weights[k]; }
-  return { total_score: clamp(total), weights };
-function currentWeights(){
-  const sum = (a,b,c,d,e)=>a+b+c+d+e;
-  let w1 = Number(document.getElementById('w_rating')?.value ?? 22);
-  let w2 = Number(document.getElementById('w_burst') ?.value ?? 22);
-  let w3 = Number(document.getElementById('w_text')  ?.value ?? 20);
-  let w4 = Number(document.getElementById('w_phrase')?.value ?? 18);
-  let w5 = Number(document.getElementById('w_user')  ?.value ?? 18);
-  const s = sum(w1,w2,w3,w4,w5) || 1;
-  // 合計100に正規化
-  w1 = w1/s; w2 = w2/s; w3 = w3/s; w4 = w4/s; w5 = w5/s;
-  return {
-    rating_skew: w1, burstiness: w2, text_similarity: w3,
-    phrase_flags: w4, reviewer_behavior: w5
-  };
-}
-
-function analyzeRows(rows){
-  // ... scores の計算は今のまま
-  const scores = { /* 省略：既存のs1～s5 */ };
-  const agg = aggregateScores(scores, currentWeights());
-  // 以降は既存の summary/render を再利用
-}
-
-document.getElementById('btnRecalc')?.addEventListener('click', ()=>{
-  if(!window.__lastRows){ alert('先に解析してください'); return; }
-  analyzeRows(window.__lastRows);
-});
-
-
-}
-
-// ====== 描画 ======
-let chartRatings = null, chartDaily = null;
-
-function renderSummary(summary){
-  document.getElementById('summaryNone').style.display='none';
-  const box = document.getElementById('summary'); box.style.display='block';
-  const overall = summary.overall_score;
-  const lab = labelFromScore(overall);
-  document.getElementById('overallScore').textContent = overall.toFixed(1);
-  const el = document.getElementById('overallLabel');
-  el.textContent = lab.text; el.className = 'score-badge '+lab.cls;
-  document.getElementById('nReviews').textContent = String(summary.n_reviews);
-  document.getElementById('range').textContent = summary.range;
-  const tbody = document.querySelector('#compTable tbody');
-  tbody.innerHTML = '';
-  Object.entries(summary.components).forEach(([k,v])=>{
-    const tr = document.createElement('tr');
-    const name = ({rating_skew:'星評価の偏り', burstiness:'短期集中', text_similarity:'本文類似', phrase_flags:'定型句検出', reviewer_behavior:'レビュアー行動'})[k] || k;
-    tr.innerHTML = `<td>${name}</td><td>${v.toFixed(1)}</td>`; tbody.appendChild(tr);
-  });
-}
-
-function renderCharts(rows){
-  const ctx1 = document.getElementById('chartRatings');
-  const counts = {1:0,2:0,3:0,4:0,5:0}; rows.forEach(r=>{ const k=Number(r.rating)||0; if(counts[k]!=null) counts[k]++; });
-  const labels = ['1','2','3','4','5']; const dataVals = labels.map(k=>counts[Number(k)]);
-  if(chartRatings){ chartRatings.destroy(); }
-  chartRatings = new Chart(ctx1, { type:'bar', data:{ labels, datasets:[{ label:'星評価の分布', data:dataVals }]}, options:{ responsive:true, plugins:{legend:{display:false}} }});
-
-  const ctx2 = document.getElementById('chartDaily');
-  const daily = {};
-  rows.forEach(r=>{ const d=r.date; daily[d]=(daily[d]||0)+1; });
-  const sorted = Object.entries(daily).sort((a,b)=> new Date(a[0]) - new Date(b[0]));
-  if(chartDaily){ chartDaily.destroy(); }
-  chartDaily = new Chart(ctx2, { type:'bar', data:{ labels: sorted.map(x=>x[0]), datasets:[{ label:'日別レビュー件数', data: sorted.map(x=>x[1]) }]}, options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{ maxRotation:80, minRotation:30 }}} }});
-}
-
-function renderFlags(rows){
-  const flagsNone = document.getElementById('flagsNone');
-  const wrap = document.getElementById('flagsWrap');
-  const tbody = document.querySelector('#flagsTable tbody');
-  flagsNone.style.display='none'; wrap.style.display='block';
-  tbody.innerHTML='';
-  const phraseRe = new RegExp([ '神コスパ','最高','超おすすめ','星5','五つ星','提供','無料提供','PR','割引コード','クーポン','届いてすぐ','リピ確定','感動','奇跡','神' ].join('|'));
-  rows.slice(0,50).forEach(r=>{
-    const text = String(r.text||'');
-    const tr = document.createElement('tr');
-    const short = text.length < 12; const manyEx = (text.match(/!/g)||[]).length >= 2;
-    const phrase = phraseRe.test(text);
-    tr.innerHTML = `<td>${r.user_id||''}</td><td>${r.date||''}</td><td>${r.rating||''}</td><td>${phrase? '✓':''}</td><td>${short? '✓':''}</td><td>${manyEx? '✓':''}</td><td>${text.replace(/[<>]/g, s=>({'<':'&lt;','>':'&gt;'}[s]))}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-// ====== 入力の取り込み ======
-function parseCSV(text){
-  const res = Papa.parse(text.trim(), { header:true, skipEmptyLines:true });
-  if(res.errors?.length){ console.warn(res.errors); }
-  return res.data.map(r=>({
-    user_id: r.user_id ?? r.user ?? r.uid ?? '',
-    rating: Number(r.rating||r.stars||r.score||0),
-    date: String(r.date||r.created||'').slice(0,10),
-    text: r.text ?? r.body ?? r.review ?? ''
-  })).filter(r=>r.date);
-}
-
-function parseJSON(text){
-  const arr = JSON.parse(text);
-  return arr.map(o=>({
-    user_id: o.user_id ?? o.user ?? o.uid ?? '',
-    rating: Number(o.rating||o.stars||o.score||0),
-    date: String(o.date||o.created||'').slice(0,10),
-    text: o.text ?? o.body ?? o.review ?? ''
-  })).filter(r=>r.date);
-}
-
-async function readFileAsText(file){
-  return new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsText(file,'utf-8'); });
-}
-
-function dateRange(rows){
-  if(!rows.length) return '—';
-  const ds = rows.map(r=> new Date(r.date)).sort((a,b)=>a-b);
-  const toISO = d => d.toISOString().slice(0,10);
-  return `${toISO(ds[0])} 〜 ${toISO(ds[ds.length-1])}`;
-}
-
-// ====== 解析メイン ======
-function analyzeRows(rows){
-  if(!rows.length){ alert('データがありません'); return; }
-  // スコア群
-  const s1 = scoreRatingSkew(rows);
-  const s2 = scoreBurstiness(rows);
-  const s3 = scoreTextSimilarity(rows);
-  const s4 = scorePhraseFlags(rows);
-  const s5 = scoreReviewerBehavior(rows);
-  const scores = { rating_skew:s1, burstiness:s2, text_similarity:s3, phrase_flags:s4, reviewer_behavior:s5 };
-  const agg = aggregateScores(scores);
-  const label = labelFromScore(agg.total_score);
-  const summary = {
-    overall_score: agg.total_score,
-    overall_label: label.text,
-    components: Object.fromEntries(Object.entries(scores).map(([k,v])=>[k, v.score])),
-    n_reviews: rows.length,
-    range: dateRange(rows)
-  };
-  renderSummary(summary);
-  renderCharts(rows);
-  renderFlags(rows);
-  // エクスポート用オブジェクトを保存
-  window.__lastResult = { summary, details: Object.fromEntries(Object.entries(scores).map(([k,v])=>[k,v.detail])) };
-}
-
-// ====== イベント ======
-const textEl = document.getElementById('text');
-const fileEl = document.getElementById('file');
-
-document.getElementById('btnDemo').addEventListener('click', ()=>{
-  textEl.value = DEMO_CSV.trim();
-});
-
-document.getElementById('btnClear').addEventListener('click', ()=>{
-  textEl.value = ''; fileEl.value = ''; document.getElementById('summary').style.display='none'; document.getElementById('summaryNone').style.display='block';
-  document.getElementById('flagsWrap').style.display='none'; document.getElementById('flagsNone').style.display='block';
-  if(chartRatings){ chartRatings.destroy(); chartRatings=null; }
-  if(chartDaily){ chartDaily.destroy(); chartDaily=null; }
-});
-
-document.getElementById('btnAnalyze').addEventListener('click', async ()=>{
-  let rows = [];
-  if(fileEl.files && fileEl.files[0]){
-    const txt = await readFileAsText(fileEl.files[0]);
-    const name = fileEl.files[0].name.toLowerCase();
-    if(name.endsWith('.json')) rows = parseJSON(txt);
-    else rows = parseCSV(txt);
-  }else{
-    const t = textEl.value.trim();
-    if(!t){ alert('ファイルを選ぶか、テキストを貼り付けてください'); return; }
-    if(t.startsWith('[') || t.startsWith('{')) rows = parseJSON(t);
-    else rows = parseCSV(t);
-  }
-  try{ analyzeRows(rows); }catch(e){ console.error(e); alert('解析に失敗しました: '+ e.message); }
-});
-
-document.getElementById('btnExportJson').addEventListener('click', ()=>{
-  const obj = window.__lastResult;
-  if(!obj){ alert('まず解析を実行してください'); return; }
-  const blob = new Blob([JSON.stringify(obj,null,2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='sakura_checker_lite_report.json'; a.click();
-  setTimeout(()=> URL.revokeObjectURL(url), 1500);
-});
-
-// ====== デモCSV ======
-const DEMO_CSV = `user_id,rating,date,text
-userN0,5,2025-07-20,思ったより良かった。値段相応かな。
-userN1,5,2025-07-14,梱包は丁寧。初期設定も簡単だった。
-userN2,4,2025-07-07,可もなく不可もなく。必要十分。
-userN3,5,2025-07-03,音は静か。ただ耐久性はこれからです。
-userN4,5,2025-07-22,発送が早くて助かった。説明書も分かりやすい。
-userN5,3,2025-07-24,サイズ感がちょうど良い。デザインはシンプル。
-userN6,4,2025-07-16,コスパは悪くない。保証がもう少し長ければ満点。
-userN7,5,2025-07-12,リピートするかは微妙。普段使いならOK。
-userN8,4,2025-07-13,家族用に購入。今のところ問題なし。
-userN9,4,2025-07-25,セールで買ったが満足。耐久に期待。
-userS0,5,2025-07-06,最高です！神コスパ！友人にも勧めます！！
-userS1,5,2025-07-06,届いてすぐ使いました。最高です！神コスパ！
-userS2,5,2025-07-06,割引コードでお得に買えました！神コスパ！
-userS3,5,2025-07-06,最高！買ってよかった！神コスパ！
-userS4,5,2025-07-06,神コスパ！最高！リピ確定！
-userS0,5,2025-07-06,無料提供で試しましたが最高！神コスパ！
-userS1,5,2025-07-06,最高です！神コスパ！友人にも勧めます！！
-userS2,5,2025-07-06,届いてすぐ使いました。最高です！神コスパ！
-userS3,5,2025-07-06,割引コードでお得に買えました！神コスパ！
-userS4,5,2025-07-06,最高！買ってよかった！神コスパ！
-userS0,5,2025-07-06,神コスパ！最高！リピ確定！
-userS1,5,2025-07-06,無料提供で試しましたが最高！神コスパ！
-userS2,5,2025-07-06,最高です！神コスパ！友人にも勧めます！！
-userS3,5,2025-07-06,届いてすぐ使いました。最高です！神コスパ！
-userS4,5,2025-07-06,割引コードでお得に買えました！神コスパ！
-userS0,5,2025-07-07,最高！買ってよかった！神コスパ！
-userS1,5,2025-07-07,神コスパ！最高！リピ確定！
-userS2,5,2025-07-07,無料提供で試しましたが最高！神コスパ！
-userS3,5,2025-07-07,最高です！神コスパ！友人にも勧めます！！
-userS4,5,2025-07-07,届いてすぐ使いました。最高です！神コスパ！`;
+  // 公開
+  window.addDay = addDay; window.removeDay = removeDay;
+  window.addMoney = addMoney; window.removeMoney = removeMoney;
+  window.resetData = resetData; window.saveToSelectedMonth = saveToSelectedMonth;
+  window.printView = printView; window.exportCSV = exportCSV;
+  window.exportJSON = exportJSON; window.exportPNG = exportPNG;
+})();
 </script>
-
-<!-- body 終了前に（既存<script>の最後でOK） -->
-<script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js");
-  }
-</script>
-<!-- bodyのどこかに -->
-<small>最終更新: <span id="lastUpdated"></span></small>
-<script>
-  document.getElementById('lastUpdated').textContent =
-    new Date(document.lastModified).toLocaleString();
-</script>
-
 </body>
 </html>
