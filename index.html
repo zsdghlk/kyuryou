@@ -10,10 +10,10 @@
   h1{text-align:center}
   .status,.salary,.total{padding:10px 12px;background:#f7f9fc;border:1px solid #e8eef7;border-radius:12px;margin:10px 0;font-weight:700}
   .salary,.total{background:#0b1020;color:#fff;text-align:center}
-  .grid{display:grid;gap:10px}
-  @media (min-width:560px){ .grid{ grid-template-columns:repeat(2,1fr) } }
+  select{height:44px;padding:0 10px;border-radius:10px;border:1px solid #dbe4f2;background:#fff}
   button{padding:12px;border:none;border-radius:10px;color:#fff;font-size:16px;cursor:pointer}
-  .plus{background:#2563eb}.minus{background:#0ea5e9}.reset{background:#dc2626}.save-btn{background:#059669}.export-btn{background:#7c3aed}
+  .reset{background:#dc2626}.save-btn{background:#059669}.export-btn{background:#7c3aed}
+  .plus{background:#2563eb}.minus{background:#0ea5e9}
   .row{display:grid;gap:10px}
   @media (min-width:560px){ .row{ grid-template-columns:1fr auto } }
   .months{margin-top:20px}
@@ -24,35 +24,30 @@
   .month-input{width:110px;text-align:right;border:none;background:transparent;font-size:15px;padding:4px 6px;border-radius:6px}
   .month-unit{font-size:14px;color:#334155}
   .month-days{color:#64748b;font-size:13px}
-  .control-bar{display:grid;gap:10px;margin:10px 0}
-  @media (min-width:560px){ .control-bar{grid-template-columns:repeat(4,1fr)} }
-  .step-row{display:grid;gap:10px;grid-template-columns:1fr 1fr}
-  @media (min-width:560px){ .step-row{grid-template-columns:1fr 1fr 1fr} }
-  select{height:44px;padding:0 10px;border-radius:10px;border:1px solid #dbe4f2;background:#fff}
+  .control-block{display:grid;gap:10px;margin:10px 0}
 </style>
 </head>
 <body>
 <div class="card">
   <h1>給料計算ツール</h1>
 
-  <div class="status">勤務日数: <span id="days">0</span> 日</div>
-
-  <!-- 勤務日数コントロール -->
-  <div class="control-bar">
-    <button class="plus"  onclick="addDay()">＋1日</button>
-    <button class="minus" onclick="removeDay()">−1日</button>
-    <button class="plus"  onclick="addDay10()">＋10日</button>
-    <button class="minus" onclick="removeDay10()">−10日</button>
+  <!-- 日数プルダウン -->
+  <div class="control-block">
+    <label for="daysSelect">勤務日数:</label>
+    <select id="daysSelect"></select>
   </div>
 
-  <!-- 追加金額コントロール（プルダウン選択） -->
-  <div class="step-row">
-    <select id="stepSelect" aria-label="追加金額の選択（100円刻み）"></select>
-    <button class="plus"  onclick="addMoneyByStep()">＋選択額</button>
-    <button class="minus" onclick="removeMoneyByStep()">−選択額</button>
+  <!-- 追加金額プルダウン -->
+  <div class="control-block">
+    <label for="stepSelect">追加金額:</label>
+    <div style="display:flex;gap:8px">
+      <select id="stepSelect"></select>
+      <button class="plus" onclick="addMoneyByStep()">＋</button>
+      <button class="minus" onclick="removeMoneyByStep()">−</button>
+    </div>
   </div>
 
-  <div class="grid" style="margin-top:10px">
+  <div class="control-block">
     <button class="reset" onclick="resetData()">リセット</button>
   </div>
 
@@ -83,42 +78,34 @@
 <script>
 /* ====== 設定・状態 ====== */
 const WAGE=1300, BASE_HOURS=7;
-const STORAGE_MONTHS='salaryMonths_v5'; // { [m]: {amount, days} }
-const STORAGE_STATE ='salaryState_v3';  // { days, extraMoney, step }
+const STORAGE_MONTHS='salaryMonths_v6'; 
+const STORAGE_STATE ='salaryState_v4';  
 
 let days=0, extraMoney=0, step=1300;
-let months={}; // { '1': {amount, days}, ... }
+let months={}; 
 
 /* ====== ユーティリティ ====== */
 const fmtJPY=n=>Number(n||0).toLocaleString();
 const onlyDigits=s=>(s||'').replace(/[^\d]/g,'');
+
+/* ====== 計算 ====== */
 const currentTotal=()=> (WAGE*BASE_HOURS*days)+extraMoney;
 
 /* ====== 表示 ====== */
 function render(){
-  document.getElementById('days').textContent=days;
   document.getElementById('salary').textContent='給料：'+fmtJPY(currentTotal())+' 円';
+  document.getElementById('daysSelect').value=String(days);
 }
 
-/* ====== 日数操作 ====== */
-function addDay(){days++; saveState(); render();}
-function removeDay(){if(days>0) days--; saveState(); render();}
-function addDay10(){days+=10; saveState(); render();}
-function removeDay10(){days=Math.max(0, days-10); saveState(); render();}
+/* ====== 金額操作 ====== */
+function getStep(){ step=Number(document.getElementById('stepSelect').value)||1300; saveState(); return step; }
+function addMoneyByStep(){ extraMoney+=getStep(); saveState(); render(); }
+function removeMoneyByStep(){ extraMoney=Math.max(0,extraMoney-getStep()); saveState(); render(); }
 
-/* ====== 金額操作（選択額） ====== */
-function getStep(){
-  const s = Number(document.getElementById('stepSelect').value);
-  step = isNaN(s)? step : s;
-  return step;
-}
-function addMoneyByStep(){ extraMoney += getStep(); saveState(); render(); }
-function removeMoneyByStep(){ extraMoney = Math.max(0, extraMoney - getStep()); saveState(); render(); }
-
-/* ====== 月保存（金額＋日数） ====== */
+/* ====== 月保存 ====== */
 function saveToSelectedMonth(){
-  const sel = String(document.getElementById('monthSelect').value);
-  months[sel] = { amount: currentTotal(), days: days };
+  const sel=String(document.getElementById('monthSelect').value);
+  months[sel]={ amount: currentTotal(), days: days };
   saveMonths(); buildMonthsGrid();
 }
 
@@ -128,26 +115,24 @@ function buildMonthsGrid(){
   let total=0;
   for(let m=1;m<=12;m++){
     const k=String(m);
-    const data=months[k] || {amount:0, days:0};
-    total += data.amount||0;
-
+    const data=months[k]||{amount:0,days:0};
+    total+=data.amount||0;
     const wrap=document.createElement('div'); wrap.className='month-item';
     const label=document.createElement('div'); label.className='month-label'; label.textContent=m+'月';
-
     const valueWrap=document.createElement('div'); valueWrap.className='month-value';
+
     const input=document.createElement('input'); input.className='month-input'; input.setAttribute('data-month',k);
-    input.value = data.amount ? fmtJPY(data.amount) : '';
-    input.addEventListener('input', e=>{
+    input.value=data.amount?fmtJPY(data.amount):'';
+    input.addEventListener('input',e=>{
       const raw=onlyDigits(e.target.value); e.target.value=raw;
-      months[k] = { amount: raw===''?0:Number(raw), days: (months[k]?.days||0) };
+      months[k]={ amount: raw===''?0:Number(raw), days:(months[k]?.days||0) };
       saveMonths(); updateTotal();
     });
-    input.addEventListener('blur', e=>{
-      const raw=onlyDigits(e.target.value); e.target.value = raw? fmtJPY(raw):'';
+    input.addEventListener('blur',e=>{
+      const raw=onlyDigits(e.target.value); e.target.value=raw?fmtJPY(raw):'';
     });
-    input.addEventListener('focus', e=>{
+    input.addEventListener('focus',e=>{
       const raw=onlyDigits(e.target.value); e.target.value=raw;
-      setTimeout(()=>{const len=e.target.value.length; e.target.setSelectionRange(len,len)},0);
     });
 
     const yen=document.createElement('div'); yen.className='month-unit'; yen.textContent='円';
@@ -159,84 +144,38 @@ function buildMonthsGrid(){
   }
   document.getElementById('totalYear').textContent='年間合計：'+fmtJPY(total)+' 円';
 }
-function updateTotal(){
-  let sum=0; for(let m=1;m<=12;m++){ sum += (months[String(m)]?.amount||0); }
-  document.getElementById('totalYear').textContent='年間合計：'+fmtJPY(sum)+' 円';
-}
+function updateTotal(){ let sum=0; for(let m=1;m<=12;m++){ sum+=(months[String(m)]?.amount||0); } document.getElementById('totalYear').textContent='年間合計：'+fmtJPY(sum)+' 円'; }
 
-/* ====== 保存／読込 ====== */
-function saveMonths(){ localStorage.setItem(STORAGE_MONTHS, JSON.stringify(months)); }
-function loadMonths(){
-  try{
-    const raw=localStorage.getItem(STORAGE_MONTHS);
-    const obj= raw? JSON.parse(raw): {};
-    months={};
-    for(let m=1;m<=12;m++){
-      const v=obj[String(m)];
-      if(typeof v==='number'){ months[String(m)]={amount:Number(v)||0, days:0}; }
-      else if(v && typeof v==='object'){ months[String(m)]={amount:Number(v.amount)||0, days:Number(v.days)||0}; }
-      else { months[String(m)]={amount:0, days:0}; }
-    }
-  }catch{ months={}; for(let m=1;m<=12;m++){ months[String(m)]={amount:0, days:0}; } }
-}
-function saveState(){ localStorage.setItem(STORAGE_STATE, JSON.stringify({days, extraMoney, step})); }
-function loadState(){
-  try{
-    const raw=localStorage.getItem(STORAGE_STATE);
-    if(!raw) return;
-    const s=JSON.parse(raw);
-    if(typeof s.days==='number') days=s.days;
-    if(typeof s.extraMoney==='number') extraMoney=s.extraMoney;
-    if(typeof s.step==='number') step=s.step;
-  }catch{}
-}
+/* ====== 保存 ====== */
+function saveMonths(){ localStorage.setItem(STORAGE_MONTHS,JSON.stringify(months)); }
+function loadMonths(){ try{ const raw=localStorage.getItem(STORAGE_MONTHS); months=raw?JSON.parse(raw):{}; }catch{months={};} }
+function saveState(){ localStorage.setItem(STORAGE_STATE, JSON.stringify({days,extraMoney,step})); }
+function loadState(){ try{ const raw=localStorage.getItem(STORAGE_STATE); if(!raw)return; const s=JSON.parse(raw); if(s.days)days=s.days; if(s.extraMoney)extraMoney=s.extraMoney; if(s.step)step=s.step; }catch{} }
 
 /* ====== 印刷 / CSV ====== */
 function printView(){ window.print(); }
 function exportCSV(){
   let rows=[['項目','値']];
-  rows.push(['時給', WAGE]);
-  rows.push(['基本勤務時間(時間/日)', BASE_HOURS]);
-  rows.push(['現在の勤務日数(自動保存)', days]);
-  rows.push(['現在の追加金額(選択額の累計)', extraMoney]);
-  rows.push(['現在表示の給料', currentTotal()]);
-  rows.push([]);
-  rows.push(['月','金額(円)','日数']);
-  let sum=0;
-  for(let m=1;m<=12;m++){
-    const d=months[String(m)]||{amount:0,days:0};
-    rows.push([m, d.amount||0, d.days||0]);
-    sum+=d.amount||0;
-  }
-  rows.push([]); rows.push(['年間合計', sum]);
-
-  const csv=rows.map(r=>r.map(x=>{
-    const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-  }).join(',')).join('\n');
-
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download=`salary_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
+  rows.push(['時給',WAGE]); rows.push(['基本勤務時間(時間/日)',BASE_HOURS]); rows.push(['現在勤務日数',days]); rows.push(['現在追加金額',extraMoney]); rows.push(['現在の給料',currentTotal()]);
+  rows.push([]); rows.push(['月','金額(円)','日数']);
+  let sum=0; for(let m=1;m<=12;m++){ const d=months[String(m)]||{amount:0,days:0}; rows.push([m,d.amount||0,d.days||0]); sum+=d.amount||0; }
+  rows.push([]); rows.push(['年間合計',sum]);
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='salary.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ====== 初期化 ====== */
-function buildStepOptions(){
-  const sel=document.getElementById('stepSelect');
-  sel.innerHTML='';
-  for(let v=900; v<=10000; v+=100){
-    const opt=document.createElement('option');
-    opt.value=String(v); opt.textContent=`${fmtJPY(v)} 円`;
-    sel.appendChild(opt);
-  }
-  sel.value=String(step || 1300);
-  sel.addEventListener('change',()=>{ step = Number(sel.value)||1300; saveState(); });
+function buildDaysOptions(){
+  const sel=document.getElementById('daysSelect'); sel.innerHTML='';
+  for(let i=0;i<=365;i++){ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=i+' 日'; sel.appendChild(opt); }
+  sel.addEventListener('change',()=>{ days=Number(sel.value); saveState(); render(); });
 }
-
-(function init(){
-  document.getElementById('monthSelect').value = String(new Date().getMonth()+1);
-  loadMonths(); loadState(); buildStepOptions(); buildMonthsGrid(); render();
-})();
+function buildStepOptions(){
+  const sel=document.getElementById('stepSelect'); sel.innerHTML='';
+  for(let v=900;v<=10000;v+=100){ const opt=document.createElement('option'); opt.value=String(v); opt.textContent=`${fmtJPY(v)} 円`; sel.appendChild(opt); }
+  sel.value=String(step||1300); sel.addEventListener('change',()=>{ step=Number(sel.value)||1300; saveState(); });
+}
+(function init(){ loadMonths(); loadState(); buildDaysOptions(); buildStepOptions(); buildMonthsGrid(); render(); })();
 </script>
 </body>
 </html>
