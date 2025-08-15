@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <title>給料計算ツール</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<!-- PNG化ライブラリ（HTTPS配信時に有効） -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
 <style>
   :root{
     --card-max: 760px; --gap: 12px; --radius: 14px; --bg: #f2f5f9;
@@ -237,62 +239,40 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
 
-  // ===== 画像(PNG) — オフライン対応（SVG + foreignObject方式） =====
-  function inlineComputedStyles(node){
-    const win = node.ownerDocument.defaultView;
-    const styles = win.getComputedStyle(node);
-    const cssText = Array.from(styles).map(p => `${p}:${styles.getPropertyValue(p)}`).join(';');
-    node.setAttribute('style', cssText);
-
-    for (const child of node.children) inlineComputedStyles(child);
-  }
-
+  // ===== 画像(PNG) — html2canvas方式（HTTPSで安定） =====
   function exportPNG(){
-    const el = document.getElementById('capture-area');
-    const rect = el.getBoundingClientRect();
-    const width = Math.ceil(rect.width);
-    const height = Math.ceil(rect.height);
+    const btns = document.querySelectorAll('button');
+    const pngBtn = [...btns].find(b => /画像\(PNG\)保存/.test(b.textContent));
+    if (!window.html2canvas) {
+      alert('画像生成ライブラリの読み込みに失敗しました。通信状態を確認してください。');
+      return;
+    }
+    const area = document.getElementById('capture-area');
+    const isMobile = /Android|iP(hone|ad|od)/i.test(navigator.userAgent);
+    const isIOS   = /iP(hone|ad|od)/i.test(navigator.userAgent);
+    const isSafari= /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const scale = isMobile ? 1.5 : 2;
 
-    // クローンしてスタイルをインライン化（外部CSS不要に）
-    const clone = el.cloneNode(true);
-    inlineComputedStyles(clone);
-
-    // XHTMLシリアライズ
-    const xhtml = new XMLSerializer().serializeToString(clone);
-
-    // SVG＋foreignObjectでDOMを描画
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-        <foreignObject x="0" y="0" width="100%" height="100%">
-          <div xmlns="http://www.w3.org/1999/xhtml">${xhtml}</div>
-        </foreignObject>
-      </svg>`.trim();
-
-    const svgBlob = new Blob([svg], {type: 'image/svg+xml;charset=utf-8'});
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const canvas = document.createElement('canvas');
-      canvas.width = width * (window.devicePixelRatio || 1);
-      canvas.height = height * (window.devicePixelRatio || 1);
-      const ctx = canvas.getContext('2d');
-      ctx.scale((window.devicePixelRatio || 1), (window.devicePixelRatio || 1));
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-
+    if (pngBtn) { pngBtn.disabled = true; pngBtn.textContent = '生成中…'; }
+    html2canvas(area, {
+      scale,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      windowWidth: document.documentElement.scrollWidth,
+      windowHeight: document.documentElement.scrollHeight,
+      scrollX: 0,
+      scrollY: -window.scrollY  // ページ途中でも全体を撮る
+    }).then(canvas => {
       const dataURL = canvas.toDataURL('image/png');
-
-      // iOS/Safariは新規タブで開く
       if (isIOS || isSafari) {
         const w = window.open();
         if (w) {
           w.document.write('<html><head><title>salary.png</title></head><body style="margin:0"><img src="'+dataURL+'" style="width:100%;height:auto"/></body></html>');
           w.document.close();
         } else {
-          const a = document.createElement('a'); a.href = dataURL; a.target = '_blank'; document.body.appendChild(a); a.click(); a.remove();
+          const a = document.createElement('a');
+          a.href = dataURL; a.target = '_blank';
+          document.body.appendChild(a); a.click(); a.remove();
         }
       } else {
         const a = document.createElement('a');
@@ -300,12 +280,12 @@
         a.download = `salary_${new Date().toISOString().slice(0,10)}.png`;
         document.body.appendChild(a); a.click(); a.remove();
       }
-    };
-    img.onerror = () => {
-      alert('画像変換に失敗しました。お手数ですが「印刷 / PDF保存」をご利用ください。');
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
+    }).catch(err => {
+      console.error(err);
+      alert('画像の生成に失敗しました。ページ最上部までスクロールして再試行するか、印刷/PDF保存をご利用ください。');
+    }).finally(() => {
+      if (pngBtn) { pngBtn.disabled = false; pngBtn.textContent = '画像(PNG)保存'; }
+    });
   }
 
   // ===== 初期化 =====
