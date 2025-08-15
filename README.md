@@ -1,1 +1,1 @@
-# sakura-checker-lite
+# kyuryo
