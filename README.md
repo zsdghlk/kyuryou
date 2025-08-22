@@ -129,7 +129,7 @@ Feel free to use, modify, and distribute.
 ---
 
 ## 📂 ファイル構成
-├── index.html # メインアプリケーション（HTML + CSS + JS を1ファイルに統合）
+├── index.html # メインアプリケーション（HTML + CSS + JS を1ファイルに統合）  
 ├── README.md # このドキュメント
 
 ---
