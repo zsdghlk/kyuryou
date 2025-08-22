@@ -1,57 +1,42 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>給料計算ツール / Salary Calculator</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
-
-  <!-- --- Security hardening (for GitHub Pages-friendly meta) --- -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self';
-                 script-src 'self';
-                 style-src 'self' 'unsafe-inline';
-                 img-src 'self' data:;
-                 base-uri 'none';
-                 form-action 'self';
-                 frame-ancestors 'none'">
-  <meta http-equiv="Referrer-Policy" content="no-referrer">
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="Permissions-Policy"
-        content="geolocation=(), camera=(), microphone=(), usb=(), payment=()">
-
-  <style>
-    :root{
-      --bg:#f2f5f9; --card:#fff; --ink:#0b1020;
-      --muted:#334155; --line:#e8eef7; --pill:#f7f9fc;
-      --ok:#059669; --warn:#dc2626; --act:#2563eb; --act2:#0ea5e9; --exp:#7c3aed;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;background:var(--bg);display:flex;justify-content:center}
-    .card{width:min(96vw,820px);background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.1);padding:20px;margin:20px}
-    h1{margin:0 0 6px;text-align:center}
-    .sub{margin:0 0 16px;text-align:center;color:#64748b;font-size:13px}
-    .toolbar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:8px 0 16px}
-    .toolbar .group{display:flex;gap:8px;align-items:center;background:var(--pill);border:1px solid var(--line);padding:6px 10px;border-radius:12px}
-    .toolbar label{font-size:13px;color:var(--muted)}
-    select,input[type="number"]{height:36px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:#fff}
-    .status,.salary,.total{padding:10px 12px;background:var(--pill);border:1px solid var(--line);border-radius:12px;margin:10px 0;font-weight:700}
-    .salary,.total{background:var(--ink);color:#fff;text-align:center}
-    button{padding:10px 14px;border:none;border-radius:10px;color:#fff;font-size:15px;cursor:pointer}
-    .reset{background:var(--warn)} .save-btn{background:var(--ok)} .export-btn{background:var(--exp)}
-    .plus{background:var(--act)} .minus{background:var(--act2)}
-    .row{display:grid;gap:10px}
-    @media (min-width:560px){ .row{ grid-template-columns:1fr auto } }
-    .control-block{display:grid;gap:8px;margin:10px 0}
-    .months{margin-top:20px}
-    .months-grid{display:grid;gap:8px}
-    .month-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fbfdff}
-    .month-label{font-weight:600;color:var(--muted)}
-    .month-value{display:flex;gap:6px;align-items:center}
-    .month-input{width:160px;text-align:right;border:none;background:transparent;font-size:15px;padding:4px 6px;border-radius:6px}
-    .month-unit{font-size:14px;color:var(--muted)}
-    .month-days{color:#64748b;font-size:13px}
-    .btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-  </style>
+<meta charset="UTF-8" />
+<title>給料計算ツール / Salary Calculator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<style>
+  :root{
+    --bg:#f2f5f9; --card:#fff; --ink:#0b1020;
+    --muted:#334155; --line:#e8eef7; --pill:#f7f9fc;
+    --ok:#059669; --warn:#dc2626; --act:#2563eb; --act2:#0ea5e9; --exp:#7c3aed;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;background:var(--bg);display:flex;justify-content:center}
+  .card{width:min(96vw,820px);background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.1);padding:20px;margin:20px}
+  h1{margin:0 0 6px;text-align:center}
+  .sub{margin:0 0 16px;text-align:center;color:#64748b;font-size:13px}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:8px 0 16px}
+  .toolbar .group{display:flex;gap:8px;align-items:center;background:var(--pill);border:1px solid var(--line);padding:6px 10px;border-radius:12px}
+  .toolbar label{font-size:13px;color:var(--muted)}
+  select,input[type="number"]{height:36px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:#fff}
+  .status,.salary,.total{padding:10px 12px;background:var(--pill);border:1px solid var(--line);border-radius:12px;margin:10px 0;font-weight:700}
+  .salary,.total{background:var(--ink);color:#fff;text-align:center}
+  button{padding:10px 14px;border:none;border-radius:10px;color:#fff;font-size:15px;cursor:pointer}
+  .reset{background:var(--warn)} .save-btn{background:var(--ok)} .export-btn{background:var(--exp)}
+  .plus{background:var(--act)} .minus{background:var(--act2)}
+  .row{display:grid;gap:10px}
+  @media (min-width:560px){ .row{ grid-template-columns:1fr auto } }
+  .control-block{display:grid;gap:8px;margin:10px 0}
+  .months{margin-top:20px}
+  .months-grid{display:grid;gap:8px}
+  .month-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fbfdff}
+  .month-label{font-weight:600;color:var(--muted)}
+  .month-value{display:flex;gap:6px;align-items:center}
+  .month-input{width:160px;text-align:right;border:none;background:transparent;font-size:15px;padding:4px 6px;border-radius:6px}
+  .month-unit{font-size:14px;color:var(--muted)}
+  .month-days{color:#64748b;font-size:13px}
+  .btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+</style>
 </head>
 <body>
 <div class="card">
@@ -130,8 +115,8 @@
 <script>
 /* ====== 設定・状態（内部は JPY 基準） ====== */
 const WAGE_JPY = 1300;                      // 時給（JPY固定・内部基準）
-const STORAGE_MONTHS = 'salaryMonths_v10';  // { [m]: {amountJPY, days} }
-const STORAGE_STATE  = 'salaryState_v9';    // { days,hours,extraJPY,stepJPY,lang,currency,rate }
+const STORAGE_MONTHS = 'salaryMonths_v9';   // { [m]: {amountJPY, days} }
+const STORAGE_STATE  = 'salaryState_v8';    // { days,hours,extraJPY,stepJPY,lang,currency,rate }
 
 let days = 0, hours = 8, extraJPY = 0, stepJPY = 1300;
 let months = {};
@@ -210,21 +195,15 @@ const WEEKDAY_NAMES = {
   en: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 };
 
-/* ====== 小さなユーティリティ ====== */
-const onlyDigits = s => (s||'').replace(/[^\d.]/g,'');
-const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
-const SAFE_MAX = 1e12; // 兆円/兆ドルを超えるような異常値の見栄え崩れ防止
-
 /* ====== 通貨/数値フォーマット ====== */
 function fmtCurrencyJPY(n){
-  const v = clamp(Number(n||0), -SAFE_MAX, SAFE_MAX);
-  return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(v);
+  return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n||0));
 }
 function fmtCurrencyUSD(n){
-  const v = clamp(Number(n||0), -SAFE_MAX, SAFE_MAX);
-  return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'USD'}).format(v);
+  return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'USD'}).format(Number(n||0));
 }
 function fmtCurrency(amount, cur){ return cur==='USD' ? fmtCurrencyUSD(amount) : fmtCurrencyJPY(amount); }
+const onlyDigits = s => (s||'').replace(/[^\d.]/g,'');
 
 /* ====== 日付フォーマッタ（見出し用：月名/曜日を言語に合わせる） ====== */
 function formatTodayLabel(){
@@ -241,26 +220,12 @@ function formatTodayLabel(){
   }
 }
 
-/* ====== 換算（内部はすべて JPY 保持） ====== */
-const toDisplay = jpy => {
-  const base = Number(jpy||0);
-  if (currency === 'USD') {
-    const r = Number(usdJpyRate||0);
-    return r > 0 ? base / r : 0;
-  }
-  return base;
-};
-const fromDisplayToJPY = disp => {
-  const base = Number(disp||0);
-  if (currency === 'USD') {
-    const r = Number(usdJpyRate||0);
-    return r > 0 ? base * r : 0;
-  }
-  return base;
-};
+/* ====== 換算（内部はJPY） ====== */
+const toDisplay = jpy => currency==='USD' ? (Number(jpy||0) / usdJpyRate) : Number(jpy||0);
+const fromDisplayToJPY = disp => currency==='USD' ? Number(disp||0) * usdJpyRate : Number(disp||0);
 
 /* ====== 計算（内部JPY） ====== */
-const currentTotalJPY = () => clamp((WAGE_JPY * hours * days) + extraJPY, -SAFE_MAX, SAFE_MAX);
+const currentTotalJPY = () => (WAGE_JPY * hours * days) + extraJPY;
 
 /* ====== UI反映 ====== */
 function renderTexts(){
@@ -299,8 +264,8 @@ function getStepJPY(){
   saveState(); 
   return stepJPY; 
 }
-function addMoneyByStep(){ extraJPY = clamp(extraJPY + getStepJPY(), -SAFE_MAX, SAFE_MAX); saveState(); renderMain(); }
-function removeMoneyByStep(){ extraJPY = clamp(Math.max(0, extraJPY - getStepJPY()), 0, SAFE_MAX); saveState(); renderMain(); }
+function addMoneyByStep(){ extraJPY += getStepJPY(); saveState(); renderMain(); }
+function removeMoneyByStep(){ extraJPY = Math.max(0, extraJPY - getStepJPY()); saveState(); renderMain(); }
 
 /* ====== リセット ====== */
 function resetData(){
@@ -344,7 +309,7 @@ function buildMonthsGrid(){
       const raw=onlyDigits(e.target.value);
       e.target.value=raw;
       const jpy = fromDisplayToJPY(raw===''?0:Number(raw));
-      months[k]={ amountJPY: clamp(jpy, 0, SAFE_MAX), days:(months[k]?.days||0) };
+      months[k]={ amountJPY: jpy, days:(months[k]?.days||0) };
       saveMonths(); updateTotal();
     });
     input.addEventListener('blur',e=>{
@@ -374,13 +339,13 @@ function loadState(){
   try{ 
     const raw=localStorage.getItem(STORAGE_STATE); if(!raw) return; 
     const s=JSON.parse(raw)||{}; 
-    if(typeof s.days==='number')days=clamp(s.days,0,365); 
-    if(typeof s.hours==='number')hours=clamp(s.hours,1,24); 
-    if(typeof s.extraJPY==='number')extraJPY=clamp(s.extraJPY,0,SAFE_MAX); 
-    if(typeof s.stepJPY==='number')stepJPY=clamp(s.stepJPY,900,10000); 
-    if(typeof s.lang==='string')lang=(s.lang==='en'?'en':'ja');
-    if(typeof s.currency==='string')currency=(s.currency==='USD'?'USD':'JPY');
-    if(typeof s.rate==='number')usdJpyRate=clamp(s.rate,0.01,100000);
+    if(typeof s.days==='number')days=s.days; 
+    if(typeof s.hours==='number')hours=s.hours; 
+    if(typeof s.extraJPY==='number')extraJPY=s.extraJPY; 
+    if(typeof s.stepJPY==='number')stepJPY=s.stepJPY; 
+    if(typeof s.lang==='string')lang=s.lang;
+    if(typeof s.currency==='string')currency=s.currency;
+    if(typeof s.rate==='number')usdJpyRate=s.rate;
   }catch{} 
 }
 
@@ -405,14 +370,12 @@ function exportCSV(){
   for(let m=1;m<=12;m++){
     const d=months[String(m)]||{amountJPY:0,days:0};
     const monthName = MONTH_NAMES[lang][m-1]; // 月名を言語で出力
-    const amountDisp = Number(toDisplay(d.amountJPY));
-    const fixed = currency==='USD' ? amountDisp.toFixed(2) : Math.round(amountDisp).toString();
-    rows.push([monthName, fixed, `${d.days||0}`]);
+    const amountDisp = Number(toDisplay(d.amountJPY)).toFixed(currency==='USD'?2:0);
+    rows.push([monthName, amountDisp, lang==='ja' ? `${d.days||0}` : `${d.days||0}`]);
     sumJPY+=d.amountJPY||0; 
   }
   rows.push([]); 
-  const totalDisp = Number(toDisplay(sumJPY));
-  rows.push([H.csvYear, currency==='USD'? totalDisp.toFixed(2) : Math.round(totalDisp).toString()]);
+  rows.push([H.csvYear, Number(toDisplay(sumJPY)).toFixed(currency==='USD'?2:0)]);
 
   const csv=rows.map(r=>r.map(x=>{
     const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
@@ -428,7 +391,7 @@ function exportCSV(){
 function buildDaysOptions(){
   const sel=document.getElementById('daysSelect'); sel.innerHTML='';
   for(let i=0;i<=365;i++){ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=String(i); sel.appendChild(opt); }
-  sel.addEventListener('change',()=>{ days=clamp(Number(sel.value)||0,0,365); saveState(); renderMain(); buildMonthsGrid(); });
+  sel.addEventListener('change',()=>{ days=Number(sel.value); saveState(); renderMain(); buildMonthsGrid(); });
 }
 function buildHoursOptions(){
   const sel=document.getElementById('hoursSelect'); sel.innerHTML='';
@@ -438,7 +401,7 @@ function buildHoursOptions(){
     opt.textContent=I18N[lang].hoursOpt(h);
     sel.appendChild(opt); 
   }
-  sel.addEventListener('change',()=>{ hours=clamp(Number(sel.value)||8,1,24); saveState(); renderMain(); buildMonthsGrid(); });
+  sel.addEventListener('change',()=>{ hours=Number(sel.value); saveState(); renderMain(); buildMonthsGrid(); });
 }
 function buildStepOptions(){
   const sel=document.getElementById('stepSelect'); sel.innerHTML='';
@@ -479,12 +442,12 @@ function applyLangCurrencyUI(){
 
 /* ====== イベント配線 ====== */
 document.getElementById('langSelect').addEventListener('change', e=>{
-  lang = e.target.value === 'en' ? 'en' : 'ja';
+  lang = e.target.value;
   saveState();
   applyLangCurrencyUI();
 });
 document.getElementById('currencySelect').addEventListener('change', e=>{
-  currency = e.target.value === 'USD' ? 'USD' : 'JPY';
+  currency = e.target.value;
   saveState();
   renderTexts();
   renderMain();
@@ -492,13 +455,7 @@ document.getElementById('currencySelect').addEventListener('change', e=>{
 });
 document.getElementById('rateApplyBtn').addEventListener('click', ()=>{
   const v = Number(document.getElementById('rateInput').value);
-  if (Number.isFinite(v) && v >= 0.01 && v <= 100000) {
-    usdJpyRate = v; 
-    saveState(); renderTexts(); renderMain(); buildMonthsGrid();
-  } else {
-    alert(lang==='ja' ? 'レートは 0.01〜100000 の数値で入力してください' :
-                        'Please enter a rate between 0.01 and 100000.');
-  }
+  if(v>0){ usdJpyRate = v; saveState(); renderTexts(); renderMain(); buildMonthsGrid(); }
 });
 
 /* ====== 起動 ====== */
