@@ -11,7 +11,7 @@
     --ok:#059669; --warn:#dc2626; --act:#2563eb; --act2:#0ea5e9; --exp:#7c3aed;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;background:var(--bg);display:flex;justify-content:center}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif;background:var(--bg);display:flex;justify-content:center}
   .card{width:min(96vw,820px);background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.1);padding:20px;margin:20px}
   h1{margin:0 0 12px;text-align:center}
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:8px 0 16px}
@@ -35,13 +35,14 @@
   .month-unit{font-size:14px;color:var(--muted)}
   .month-days{color:#64748b;font-size:13px}
   .btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .wage-pair{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
 <div class="card">
   <h1 id="title">給料計算ツール</h1>
 
-  <!-- 言語/通貨ツールバー -->
+  <!-- 言語/通貨 + 時給（JPY / USD を別々に選択） -->
   <div class="toolbar">
     <div class="group">
       <label for="langSelect">Language</label>
@@ -50,6 +51,7 @@
         <option value="en">English</option>
       </select>
     </div>
+
     <div class="group">
       <label for="currencySelect" id="currencyLabel">通貨</label>
       <select id="currencySelect">
@@ -57,10 +59,18 @@
         <option value="USD">USD ($)</option>
       </select>
     </div>
-    <div class="group" id="rateGroup">
-      <label for="rateInput" id="rateLabel">レート(USD→JPY)</label>
-      <input id="rateInput" type="number" step="0.01" min="0.01" style="width:100px" />
-      <button id="rateApplyBtn" class="plus" type="button">適用</button>
+
+    <div class="group">
+      <div class="wage-pair">
+        <div style="display:flex; align-items:center; gap:6px">
+          <label for="wageJPYSelect" id="wageJPYLabel">時給(¥)</label>
+          <select id="wageJPYSelect" title="時給（日本円）"></select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px">
+          <label for="wageUSDSelect" id="wageUSDLabel">時給($)</label>
+          <select id="wageUSDSelect" title="Hourly wage (USD)"></select>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -76,7 +86,7 @@
     <select id="hoursSelect"></select>
   </div>
 
-  <!-- 追加金額 -->
+  <!-- 追加金額（通貨ごとに刻みを変更） -->
   <div class="control-block">
     <label for="stepSelect" id="extraLabel">追加金額:</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -116,16 +126,19 @@
 </div>
 
 <script>
-/* ====== 設定・状態（内部は JPY 基準） ====== */
-const WAGE_JPY = 1300;                      // 時給（JPY固定・内部基準）
-const STORAGE_MONTHS = 'salaryMonths_v8';   // { [m]: {amountJPY, days} }
-const STORAGE_STATE  = 'salaryState_v7';    // { days,hours,extraJPY,stepJPY,lang,currency,rate }
+/* ====== 設定・状態 ====== */
+/** 月データは通貨ごとに独立保存 */
+const STORAGE_MONTHS = 'salaryMonths_v9';   // { JPY:{[m]:{amount,days}}, USD:{...} }
+const STORAGE_STATE  = 'salaryState_v8';    // { days,hours,lang,currency,wageJPY,wageUSD,extraJPY,extraUSD,stepJPY,stepUSD }
 
-let days = 0, hours = 8, extraJPY = 0, stepJPY = 1300;
-let months = {};
-let lang = 'ja';            // 'ja' | 'en'
-let currency = 'JPY';       // 'JPY' | 'USD'
-let usdJpyRate = 155;       // 1 USD = X JPY
+let days = 0, hours = 8;
+let lang = 'ja';                  // 'ja' | 'en'
+let currency = 'JPY';             // 'JPY' | 'USD'
+let wageJPY = 1300, wageUSD = 12; // それぞれできりの良い数字を選択
+let extraJPY = 0, extraUSD = 0;
+let stepJPY  = 1000, stepUSD = 10;
+/** months = { JPY:{'1':{amount,days},...}, USD:{...} } */
+let months = { JPY:{}, USD:{} };
 
 /* ====== i18n ====== */
 const I18N = {
@@ -138,15 +151,14 @@ const I18N = {
     save: 'この金額を保存',
     monthSection: '月別データ',
     yearTotal: '年間合計',
-    yen: '円',
-    usd: 'ドル',
     print: '印刷 / PDF保存',
     csv: 'CSVダウンロード',
     currency: '通貨',
-    rate: 'レート(USD→JPY)',
-    wageInfo: (w, cur) => `時給: ${fmtCurrency(w, cur)}`,
+    wageJPYLabel: '時給(¥)',
+    wageUSDLabel: '時給($)',
+    wageInfo: (wJ,wU) => `時給: ¥${nf0(wJ)} / $${nf2(wU)}`,
     salaryLabel: '給料：',
-    monthUnit: (cur)=> cur==='JPY'?'円':'$',
+    unit: cur => cur==='USD'?'$':'円',
     csvHeader: ['項目','値'],
     csvWage: '時給',
     csvHours: '勤務時間(時間/日)',
@@ -165,15 +177,14 @@ const I18N = {
     save: 'Save this amount',
     monthSection: 'Monthly Data',
     yearTotal: 'Annual Total',
-    yen: 'JPY',
-    usd: 'USD',
     print: 'Print / Save PDF',
     csv: 'Download CSV',
     currency: 'Currency',
-    rate: 'Rate (USD→JPY)',
-    wageInfo: (w, cur) => `Wage: ${fmtCurrency(w, cur)}`,
+    wageJPYLabel: 'Hourly (¥)',
+    wageUSDLabel: 'Hourly ($)',
+    wageInfo: (wJ,wU) => `Wage: ¥${nf0(wJ)} / $${nf2(wU)}`,
     salaryLabel: 'Salary: ',
-    monthUnit: (cur)=> cur==='JPY'?'JPY':'USD',
+    unit: cur => cur==='USD'?'USD':'JPY',
     csvHeader: ['Item','Value'],
     csvWage: 'Hourly wage',
     csvHours: 'Working hours (per day)',
@@ -184,24 +195,28 @@ const I18N = {
     csvYear: 'Annual total',
   }
 };
-const t = (k)=> I18N[lang][k];
+const t = k => I18N[lang][k];
 
-/* ====== 通貨/数値フォーマット ====== */
-function fmtCurrencyJPY(n){ return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n||0)); }
-function fmtCurrencyUSD(n){ return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'USD'}).format(Number(n||0)); }
-function fmtCurrency(amount, cur){
-  return cur==='USD' ? fmtCurrencyUSD(amount) : fmtCurrencyJPY(amount);
+/* ====== フォーマッタ ====== */
+function nf0(n){ return Number(n||0).toLocaleString(lang==='ja'?'ja-JP':'en-US',{maximumFractionDigits:0}); }
+function nf2(n){ return Number(n||0).toLocaleString(lang==='ja'?'ja-JP':'en-US',{maximumFractionDigits:2}); }
+function fmtCurrency(n, cur){
+  if(cur==='USD') return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'USD'}).format(Number(n||0));
+  return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n||0));
 }
 const onlyDigits = s => (s||'').replace(/[^\d.]/g,'');
 
-/* ====== 換算（内部はJPY） ====== */
-const toDisplay = jpy => currency==='USD' ? (Number(jpy||0) / usdJpyRate) : Number(jpy||0);
-const fromDisplayToJPY = disp => currency==='USD' ? Number(disp||0) * usdJpyRate : Number(disp||0);
+/* ====== 現在通貨関連 ====== */
+const curExtra = () => currency==='USD' ? extraUSD : extraJPY;
+const setCurExtra = v => { if(currency==='USD') extraUSD=v; else extraJPY=v; };
+const curStep  = () => currency==='USD' ? stepUSD : stepJPY;
+const setCurStep = v => { if(currency==='USD') stepUSD=v; else stepJPY=v; };
+const curWage  = () => currency==='USD' ? wageUSD : wageJPY;
 
-/* ====== 計算（内部JPY） ====== */
-const currentTotalJPY = () => (WAGE_JPY * hours * days) + extraJPY;
+/* ====== 計算 ====== */
+const currentTotal = () => (curWage() * hours * days) + curExtra();
 
-/* ====== UI反映 ====== */
+/* ====== UIテキスト反映 ====== */
 function renderTexts(){
   document.title = `${t('title')} / Salary Calculator`;
   document.getElementById('title').textContent = t('title');
@@ -214,116 +229,126 @@ function renderTexts(){
   document.getElementById('printBtn').textContent = t('print');
   document.getElementById('csvBtn').textContent = t('csv');
   document.getElementById('currencyLabel').textContent = t('currency');
-  document.getElementById('rateLabel').textContent = t('rate');
-
-  // 月名は日本語のまま（簡素化）。必要があれば言語別の配列で置換可能
-  document.getElementById('wageInfo').textContent = t('wageInfo')( toDisplay(WAGE_JPY), currency );
+  document.getElementById('wageJPYLabel').textContent = t('wageJPYLabel');
+  document.getElementById('wageUSDLabel').textContent = t('wageUSDLabel');
+  document.getElementById('wageInfo').textContent = I18N[lang].wageInfo(wageJPY, wageUSD);
 }
 
+/* ====== メイン描画 ====== */
 function renderMain(){
-  // 給料
-  const disp = toDisplay(currentTotalJPY());
-  document.getElementById('salary').textContent = t('salaryLabel') + fmtCurrency(disp, currency);
+  const total = currentTotal();
+  document.getElementById('salary').textContent = t('salaryLabel') + fmtCurrency(total, currency);
 
-  // セレクト表示
   document.getElementById('daysSelect').value = String(days);
   document.getElementById('hoursSelect').value = String(hours);
 
-  // 追加金額ステップの中身を通貨にあわせて表示
-  buildStepOptions(); 
-  document.getElementById('stepSelect').value = String(stepJPY); // valueはJPYのまま（内部保持）
+  // 追加金額ステップ（通貨別）
+  buildStepOptions();
+  const stepVal = currency==='USD' ? stepUSD : stepJPY;
+  document.getElementById('stepSelect').value = String(stepVal);
 }
 
-/* ====== 金額操作（UIは通貨表示、内部はJPY更新） ====== */
-function getStepJPY(){ 
-  // select の value は JPY を保持している（option.value=JPY金額）
-  stepJPY = Number(document.getElementById('stepSelect').value)||1300; 
-  saveState(); 
-  return stepJPY; 
+/* ====== 金額操作 ====== */
+function getStep(){ 
+  const v = Number(document.getElementById('stepSelect').value) || 0;
+  setCurStep(v); saveState(); return v;
 }
-function addMoneyByStep(){ extraJPY += getStepJPY(); saveState(); renderMain(); }
-function removeMoneyByStep(){ extraJPY = Math.max(0, extraJPY - getStepJPY()); saveState(); renderMain(); }
+function addMoneyByStep(){ setCurExtra( curExtra() + getStep() ); saveState(); renderMain(); }
+function removeMoneyByStep(){ setCurExtra( Math.max(0, curExtra() - getStep()) ); saveState(); renderMain(); }
 
 /* ====== リセット ====== */
 function resetData(){
-  days=0; hours=8; extraJPY=0; stepJPY=1300;
-  document.getElementById('daysSelect').value = '0';
-  document.getElementById('hoursSelect').value = '8';
-  document.getElementById('stepSelect').value  = '1300';
-  saveState(); renderMain();
+  days=0; hours=8;
+  extraJPY=0; extraUSD=0;
+  stepJPY=1000; stepUSD=10;
+  wageJPY=1300; wageUSD=12;
+  document.getElementById('daysSelect').value='0';
+  document.getElementById('hoursSelect').value='8';
+  buildWageOptions(); // 初期値を反映
+  document.getElementById('wageJPYSelect').value=String(wageJPY);
+  document.getElementById('wageUSDSelect').value=String(wageUSD);
+  saveState(); renderTexts(); renderMain(); buildMonthsGrid();
 }
 
-/* ====== 月保存（内部JPYで保存） ====== */
+/* ====== 月保存（通貨別で保持） ====== */
 function saveToSelectedMonth(){
-  const sel=String(document.getElementById('monthSelect').value);
-  months[sel]={ amountJPY: currentTotalJPY(), days: days };
+  const sel = String(document.getElementById('monthSelect').value);
+  months[currency][sel] = { amount: currentTotal(), days };
   saveMonths(); buildMonthsGrid();
 }
 
 /* ====== 月一覧 ====== */
 function buildMonthsGrid(){
   const grid=document.getElementById('monthsGrid'); grid.innerHTML='';
-  let totalJPY=0;
+  let total=0;
   for(let m=1;m<=12;m++){
     const k=String(m);
-    const data=months[k]||{amountJPY:0,days:0};
-    totalJPY += data.amountJPY||0;
+    const data=(months[currency] && months[currency][k]) || {amount:0,days:0};
+    total += data.amount||0;
 
     const wrap=document.createElement('div'); wrap.className='month-item';
     const label=document.createElement('div'); label.className='month-label'; label.textContent=m+'月';
     const valueWrap=document.createElement('div'); valueWrap.className='month-value';
 
-    const input=document.createElement('input'); 
-    input.className='month-input'; 
+    const input=document.createElement('input');
+    input.className='month-input';
     input.setAttribute('data-month',k);
-    input.value = data.amountJPY ? fmtCurrency( toDisplay(data.amountJPY), currency ) : '';
+    input.value = data.amount ? fmtCurrency(data.amount, currency) : '';
     input.addEventListener('focus',e=>{
-      // 数値だけに（通貨→数字）
-      const amt = toDisplay(months[k]?.amountJPY||0);
-      e.target.value = amt? String(+amt.toFixed(currency==='USD'?2:0)) : '';
+      const amt = months[currency]?.[k]?.amount || 0;
+      e.target.value = amt ? (currency==='USD' ? String(+amt.toFixed(2)) : String(+amt.toFixed(0))) : '';
     });
     input.addEventListener('input',e=>{
       const raw=onlyDigits(e.target.value);
       e.target.value=raw;
-      const jpy = fromDisplayToJPY(raw===''?0:Number(raw));
-      months[k]={ amountJPY: jpy, days:(months[k]?.days||0) };
+      const val = raw===''?0:Number(raw);
+      if(!months[currency]) months[currency]={};
+      months[currency][k] = { amount: val, days:(months[currency]?.[k]?.days||0) };
       saveMonths(); updateTotal();
     });
     input.addEventListener('blur',e=>{
-      const disp = toDisplay(months[k]?.amountJPY||0);
-      e.target.value = disp? fmtCurrency(disp, currency) : '';
+      const amt = months[currency]?.[k]?.amount || 0;
+      e.target.value = amt? fmtCurrency(amt, currency) : '';
     });
 
-    const unit=document.createElement('div'); unit.className='month-unit'; unit.textContent = '(' + t('monthUnit')(currency) + ')';
+    const unit=document.createElement('div'); unit.className='month-unit'; unit.textContent = '(' + t('unit')(currency) + ')';
     const daySpan=document.createElement('div'); daySpan.className='month-days'; daySpan.textContent=`(${data.days||0}日)`;
 
     valueWrap.appendChild(input); valueWrap.appendChild(unit); valueWrap.appendChild(daySpan);
     wrap.appendChild(label); wrap.appendChild(valueWrap);
     grid.appendChild(wrap);
   }
-  document.getElementById('totalYear').textContent = `${t('yearTotal')}：` + fmtCurrency( toDisplay(totalJPY), currency );
+  document.getElementById('totalYear').textContent = `${t('yearTotal')}：` + fmtCurrency(total, currency);
 }
 function updateTotal(){
-  let sumJPY=0; for(let m=1;m<=12;m++){ sumJPY += (months[String(m)]?.amountJPY||0); }
-  document.getElementById('totalYear').textContent = `${t('yearTotal')}：` + fmtCurrency( toDisplay(sumJPY), currency );
+  let sum=0; for(let m=1;m<=12;m++){ sum += (months[currency]?.[String(m)]?.amount||0); }
+  document.getElementById('totalYear').textContent = `${t('yearTotal')}：` + fmtCurrency(sum, currency);
 }
 
 /* ====== 保存 ====== */
-function saveMonths(){ localStorage.setItem(STORAGE_MONTHS,JSON.stringify(months)); }
-function loadMonths(){ try{ const raw=localStorage.getItem(STORAGE_MONTHS); months=raw?JSON.parse(raw):{}; }catch{months={};} }
-function saveState(){ localStorage.setItem(STORAGE_STATE, JSON.stringify({days,hours,extraJPY,stepJPY,lang,currency,rate:usdJpyRate})); }
+function saveMonths(){ localStorage.setItem(STORAGE_MONTHS, JSON.stringify(months)); }
+function loadMonths(){ try{ const raw=localStorage.getItem(STORAGE_MONTHS); months=raw?JSON.parse(raw):{JPY:{},USD:{}}; }catch{months={JPY:{},USD:{}}; } }
+function saveState(){ 
+  localStorage.setItem(STORAGE_STATE, JSON.stringify({
+    days,hours,lang,currency,
+    wageJPY,wageUSD,extraJPY,extraUSD,stepJPY,stepUSD
+  })); 
+}
 function loadState(){ 
   try{ 
     const raw=localStorage.getItem(STORAGE_STATE); if(!raw) return; 
-    const s=JSON.parse(raw)||{}; 
-    if(typeof s.days==='number')days=s.days; 
-    if(typeof s.hours==='number')hours=s.hours; 
-    if(typeof s.extraJPY==='number')extraJPY=s.extraJPY; 
-    if(typeof s.stepJPY==='number')stepJPY=s.stepJPY; 
+    const s=JSON.parse(raw)||{};
+    if(typeof s.days==='number')days=s.days;
+    if(typeof s.hours==='number')hours=s.hours;
     if(typeof s.lang==='string')lang=s.lang;
     if(typeof s.currency==='string')currency=s.currency;
-    if(typeof s.rate==='number')usdJpyRate=s.rate;
-  }catch{} 
+    if(typeof s.wageJPY==='number')wageJPY=s.wageJPY;
+    if(typeof s.wageUSD==='number')wageUSD=s.wageUSD;
+    if(typeof s.extraJPY==='number')extraJPY=s.extraJPY;
+    if(typeof s.extraUSD==='number')extraUSD=s.extraUSD;
+    if(typeof s.stepJPY==='number')stepJPY=s.stepJPY;
+    if(typeof s.stepUSD==='number')stepUSD=s.stepUSD;
+  }catch{}
 }
 
 /* ====== 印刷 / CSV ====== */
@@ -331,21 +356,25 @@ function printView(){ window.print(); }
 function exportCSV(){
   const H = I18N[lang];
   const rows=[[H.csvHeader[0],H.csvHeader[1]]];
-  rows.push([H.csvWage, fmtCurrency(toDisplay(WAGE_JPY), currency)]);
+
+  const wageNow = curWage();
+  const extraNow = curExtra();
+
+  rows.push([H.csvWage, fmtCurrency(wageNow, currency) + (currency==='USD'?' / h':' / 時')]);
   rows.push([H.csvHours, hours]);
   rows.push([H.csvDays, days]);
-  rows.push([H.csvExtra, fmtCurrency(toDisplay(extraJPY), currency)]);
-  rows.push([H.csvNow,  fmtCurrency(toDisplay(currentTotalJPY()), currency)]);
+  rows.push([H.csvExtra, fmtCurrency(extraNow, currency)]);
+  rows.push([H.csvNow,  fmtCurrency(currentTotal(), currency)]);
   rows.push([]);
 
   rows.push([H.csvMonthHead[0], H.csvMonthHead[1] + ` (${currency})`, H.csvMonthHead[2]]);
-  let sumJPY=0; 
+  let sum=0; 
   for(let m=1;m<=12;m++){ 
-    const d=months[String(m)]||{amountJPY:0,days:0}; 
-    rows.push([m, Number(toDisplay(d.amountJPY)).toFixed(currency==='USD'?2:0), d.days||0]); 
-    sumJPY+=d.amountJPY||0; 
+    const d=months[currency]?.[String(m)]||{amount:0,days:0}; 
+    rows.push([m, currency==='USD'? Number(d.amount).toFixed(2): Number(d.amount).toFixed(0), d.days||0]); 
+    sum += d.amount||0; 
   }
-  rows.push([]); rows.push([H.csvYear, Number(toDisplay(sumJPY)).toFixed(currency==='USD'?2:0)]);
+  rows.push([]); rows.push([H.csvYear, currency==='USD'? Number(sum).toFixed(2): Number(sum).toFixed(0)]);
 
   const csv=rows.map(r=>r.map(x=>{
     const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
@@ -353,11 +382,11 @@ function exportCSV(){
 
   const a=document.createElement('a'); 
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download='salary.csv'; 
+  a.download=`salary_${currency}.csv`; 
   document.body.appendChild(a); a.click(); a.remove();
 }
 
-/* ====== 初期化構築 ====== */
+/* ====== セレクト構築 ====== */
 function buildDaysOptions(){
   const sel=document.getElementById('daysSelect'); sel.innerHTML='';
   for(let i=0;i<=365;i++){ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=String(i); sel.appendChild(opt); }
@@ -365,32 +394,72 @@ function buildDaysOptions(){
 }
 function buildHoursOptions(){
   const sel=document.getElementById('hoursSelect'); sel.innerHTML='';
-  for(let h=1;h<=24;h++){ 
-    const opt=document.createElement('option'); 
-    opt.value=String(h); 
-    opt.textContent=(lang==='ja'?`${h} 時間/日`:`${h} h/day`); 
-    sel.appendChild(opt); 
+  for(let h=1;h<=24;h++){
+    const opt=document.createElement('option');
+    opt.value=String(h);
+    opt.textContent=(lang==='ja'?`${h} 時間/日`:`${h} h/day`);
+    sel.appendChild(opt);
   }
   sel.addEventListener('change',()=>{ hours=Number(sel.value); saveState(); renderMain(); buildMonthsGrid(); });
 }
+function buildWageOptions(){
+  const jSel=document.getElementById('wageJPYSelect'); jSel.innerHTML='';
+  // JPY: ¥900〜¥5000（¥50刻み）
+  for(let v=900; v<=5000; v+=50){
+    const opt=document.createElement('option');
+    opt.value=String(v);
+    opt.textContent=`¥${nf0(v)}`;
+    jSel.appendChild(opt);
+  }
+  jSel.addEventListener('change',()=>{
+    wageJPY = Number(jSel.value)||wageJPY;
+    saveState(); renderTexts(); renderMain();
+  });
+
+  const uSel=document.getElementById('wageUSDSelect'); uSel.innerHTML='';
+  // USD: $5〜$100（$1刻み）
+  for(let v=5; v<=100; v+=1){
+    const opt=document.createElement('option');
+    opt.value=String(v);
+    opt.textContent=`$${nf2(v)}`;
+    uSel.appendChild(opt);
+  }
+  uSel.addEventListener('change',()=>{
+    wageUSD = Number(uSel.value)||wageUSD;
+    saveState(); renderTexts(); renderMain();
+  });
+}
 function buildStepOptions(){
   const sel=document.getElementById('stepSelect'); sel.innerHTML='';
-  // 内部はJPY 900〜10000を100刻みで保持。表示は選択通貨で換算
-  for(let v=900; v<=10000; v+=100){
-    const opt=document.createElement('option'); 
-    opt.value=String(v); // 内部はJPY
-    const disp = toDisplay(v);
-    opt.textContent = fmtCurrency(disp, currency);
-    sel.appendChild(opt);
+  if(currency==='USD'){
+    // USD: $1〜$100（$1刻み）
+    for(let v=1; v<=100; v+=1){
+      const opt=document.createElement('option');
+      opt.value=String(v);
+      opt.textContent=`+$${nf2(v)}`;
+      sel.appendChild(opt);
+    }
+  }else{
+    // JPY: ¥100〜¥10,000（¥100刻み）
+    for(let v=100; v<=10000; v+=100){
+      const opt=document.createElement('option');
+      opt.value=String(v);
+      opt.textContent=`+¥${nf0(v)}`;
+      sel.appendChild(opt);
+    }
   }
 }
+
+/* ====== 言語/通貨切替時の反映 ====== */
 function applyLangCurrencyUI(){
   document.getElementById('langSelect').value = lang;
   document.getElementById('currencySelect').value = currency;
-  document.getElementById('rateInput').value = String(usdJpyRate);
-  // USD以外の時はレート編集はグレーアウトしないが、常に表示（シンプルに）
+  // 時給セレクト初期値反映
+  document.getElementById('wageJPYSelect').value = String(wageJPY);
+  document.getElementById('wageUSDSelect').value = String(wageUSD);
+
   renderTexts();
-  buildHoursOptions(); // ラベル言語が変わるため再構築
+  buildHoursOptions(); // ラベルが変わるため再構築
   renderMain();
   buildMonthsGrid();
 }
@@ -398,30 +467,26 @@ function applyLangCurrencyUI(){
 /* ====== イベント配線 ====== */
 document.getElementById('langSelect').addEventListener('change', e=>{
   lang = e.target.value;
-  saveState();
-  applyLangCurrencyUI();
+  saveState(); applyLangCurrencyUI();
 });
 document.getElementById('currencySelect').addEventListener('change', e=>{
   currency = e.target.value;
   saveState();
-  renderTexts();
-  renderMain();
-  buildMonthsGrid();
-});
-document.getElementById('rateApplyBtn').addEventListener('click', ()=>{
-  const v = Number(document.getElementById('rateInput').value);
-  if(v>0){ usdJpyRate = v; saveState(); renderTexts(); renderMain(); buildMonthsGrid(); }
+  renderTexts(); renderMain(); buildMonthsGrid();
 });
 
 /* ====== 起動 ====== */
 (function init(){
   document.getElementById('monthSelect').value = String(new Date().getMonth()+1);
   loadMonths(); loadState();
-  buildDaysOptions(); buildHoursOptions(); buildStepOptions();
+  buildDaysOptions(); buildHoursOptions(); buildWageOptions(); buildStepOptions();
+
   // 復元
   document.getElementById('daysSelect').value = String(days||0);
   document.getElementById('hoursSelect').value = String(hours||8);
-  document.getElementById('stepSelect').value  = String(stepJPY||1300);
+  document.getElementById('wageJPYSelect').value = String(wageJPY||1300);
+  document.getElementById('wageUSDSelect').value = String(wageUSD||12);
+
   applyLangCurrencyUI();
 })();
 </script>
