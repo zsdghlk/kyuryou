@@ -4,6 +4,21 @@
 <meta charset="UTF-8" />
 <title>給料計算ツール / Salary Calculator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+
+<!-- 強化セキュリティ ヘッダ（meta版 / GH Pages想定） -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               base-uri 'none';
+               form-action 'self';
+               frame-ancestors 'none'">
+<meta http-equiv="Referrer-Policy" content="no-referrer">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Permissions-Policy"
+      content="geolocation=(), camera=(), microphone=(), usb=(), payment=()">
+
 <style>
   :root{
     --bg:#f2f5f9; --card:#fff; --ink:#0b1020;
@@ -60,7 +75,7 @@
       </select>
     </div>
     <div class="group" id="rateGroup">
-      <label for="rateInput" id="rateLabel">レート</label>
+      <label for="rateInput" id="rateLabel">レート(USD→JPY)</label>
       <input id="rateInput" type="number" step="0.01" min="0.01" style="width:110px" />
       <button id="rateApplyBtn" class="plus" type="button">適用</button>
     </div>
@@ -114,15 +129,19 @@
 
 <script>
 /* ====== 設定・状態（内部は JPY 基準） ====== */
-const WAGE_JPY = 1300;                      // 時給（JPY固定・内部基準）
-const STORAGE_MONTHS = 'salaryMonths_v9';   // { [m]: {amountJPY, days} }
-const STORAGE_STATE  = 'salaryState_v8';    // { days,hours,extraJPY,stepJPY,lang,currency,rate }
+const WAGE_JPY = 1300;                        // 時給（内部基準JPY）
+const STORAGE_MONTHS = 'salaryMonths_v10';     // { [m]: {amountJPY, days} }
+const STORAGE_STATE  = 'salaryState_v10';      // { days,hours,extraJPY,stepJPY,lang,currency,rate }
 
 let days = 0, hours = 8, extraJPY = 0, stepJPY = 1300;
 let months = {};
 let lang = 'ja';            // 'ja' | 'en'
 let currency = 'JPY';       // 'JPY' | 'USD'
 let usdJpyRate = 155;       // 1 USD = X JPY
+
+/* ====== 小ユーティリティ ====== */
+function clamp(n, min, max){ return Math.min(max, Math.max(min, n)); }
+const onlyDigits = s => (s||'').replace(/[^\d.]/g,'');
 
 /* ====== i18n ====== */
 const I18N = {
@@ -153,6 +172,7 @@ const I18N = {
     csvNow: '現在の給料',
     csvMonthHead: ['月','金額','日数'],
     csvYear: '年間合計',
+    alertRate: 'レートは 0.01〜100000 の数値で入力してください'
   },
   en: {
     title: 'Salary Calculator',
@@ -181,6 +201,7 @@ const I18N = {
     csvNow: 'Current salary',
     csvMonthHead: ['Month','Amount','Days'],
     csvYear: 'Annual total',
+    alertRate: 'Please enter a rate between 0.01 and 100000.'
   }
 };
 const t = (k)=> I18N[lang][k];
@@ -203,9 +224,8 @@ function fmtCurrencyUSD(n){
   return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',{style:'currency',currency:'USD'}).format(Number(n||0));
 }
 function fmtCurrency(amount, cur){ return cur==='USD' ? fmtCurrencyUSD(amount) : fmtCurrencyJPY(amount); }
-const onlyDigits = s => (s||'').replace(/[^\d.]/g,'');
 
-/* ====== 日付フォーマッタ（見出し用：月名/曜日を言語に合わせる） ====== */
+/* ====== 日付（ヘッダー表示） ====== */
 function formatTodayLabel(){
   const d = new Date();
   const y = d.getFullYear();
@@ -254,18 +274,18 @@ function renderMain(){
   document.getElementById('daysSelect').value = String(days);
   document.getElementById('hoursSelect').value = String(hours);
 
-  buildStepOptions(); 
+  buildStepOptions();
   document.getElementById('stepSelect').value = String(stepJPY); // 内部はJPYのまま保持
 }
 
 /* ====== 金額操作 ====== */
-function getStepJPY(){ 
-  stepJPY = Number(document.getElementById('stepSelect').value)||1300; 
-  saveState(); 
-  return stepJPY; 
+function getStepJPY(){
+  stepJPY = clamp(Number(document.getElementById('stepSelect').value)||1300, 0, 100000000);
+  saveState();
+  return stepJPY;
 }
-function addMoneyByStep(){ extraJPY += getStepJPY(); saveState(); renderMain(); }
-function removeMoneyByStep(){ extraJPY = Math.max(0, extraJPY - getStepJPY()); saveState(); renderMain(); }
+function addMoneyByStep(){ extraJPY = clamp(extraJPY + getStepJPY(), 0, 9e15); saveState(); renderMain(); }
+function removeMoneyByStep(){ extraJPY = clamp(extraJPY - getStepJPY(), 0, 9e15); saveState(); renderMain(); }
 
 /* ====== リセット ====== */
 function resetData(){
@@ -296,8 +316,8 @@ function buildMonthsGrid(){
     const label=document.createElement('div'); label.className='month-label'; label.textContent=MONTH_NAMES[lang][m-1];
     const valueWrap=document.createElement('div'); valueWrap.className='month-value';
 
-    const input=document.createElement('input'); 
-    input.className='month-input'; 
+    const input=document.createElement('input');
+    input.className='month-input';
     input.setAttribute('data-month',k);
     input.value = data.amountJPY ? fmtCurrency( toDisplay(data.amountJPY), currency ) : '';
 
@@ -309,7 +329,7 @@ function buildMonthsGrid(){
       const raw=onlyDigits(e.target.value);
       e.target.value=raw;
       const jpy = fromDisplayToJPY(raw===''?0:Number(raw));
-      months[k]={ amountJPY: jpy, days:(months[k]?.days||0) };
+      months[k]={ amountJPY: clamp(jpy, 0, 9e15), days:(months[k]?.days||0) };
       saveMonths(); updateTotal();
     });
     input.addEventListener('blur',e=>{
@@ -335,18 +355,22 @@ function updateTotal(){
 function saveMonths(){ localStorage.setItem(STORAGE_MONTHS,JSON.stringify(months)); }
 function loadMonths(){ try{ const raw=localStorage.getItem(STORAGE_MONTHS); months=raw?JSON.parse(raw):{}; }catch{months={};} }
 function saveState(){ localStorage.setItem(STORAGE_STATE, JSON.stringify({days,hours,extraJPY,stepJPY,lang,currency,rate:usdJpyRate})); }
-function loadState(){ 
-  try{ 
-    const raw=localStorage.getItem(STORAGE_STATE); if(!raw) return; 
-    const s=JSON.parse(raw)||{}; 
-    if(typeof s.days==='number')days=s.days; 
-    if(typeof s.hours==='number')hours=s.hours; 
-    if(typeof s.extraJPY==='number')extraJPY=s.extraJPY; 
-    if(typeof s.stepJPY==='number')stepJPY=s.stepJPY; 
-    if(typeof s.lang==='string')lang=s.lang;
-    if(typeof s.currency==='string')currency=s.currency;
-    if(typeof s.rate==='number')usdJpyRate=s.rate;
-  }catch{} 
+function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_STATE); if(!raw) return;
+    const s=JSON.parse(raw)||{};
+    if(typeof s.days==='number')days=clamp(s.days,0,365);
+    if(typeof s.hours==='number')hours=clamp(s.hours,1,24);
+    if(typeof s.extraJPY==='number')extraJPY=clamp(s.extraJPY,0,9e15);
+    if(typeof s.stepJPY==='number')stepJPY=clamp(s.stepJPY,0,100000000);
+    if(typeof s.lang==='string')lang=(s.lang==='en'?'en':'ja');
+    if(typeof s.currency==='string')currency=(s.currency==='USD'?'USD':'JPY');
+    if(typeof s.rate==='number'){
+      // 0や極端値は弾く
+      const rv = s.rate;
+      if (Number.isFinite(rv) && rv >= 0.01 && rv <= 100000) usdJpyRate = rv;
+    }
+  }catch{}
 }
 
 /* ====== 印刷 / CSV ====== */
@@ -355,7 +379,6 @@ function exportCSV(){
   const H = I18N[lang];
   const rows=[[H.csvHeader[0],H.csvHeader[1]]];
 
-  // 先頭に「日付（本日の表示）」を追加（曜日・月名は言語に合わせる）
   rows.push([lang==='ja'?'本日':'Today', document.getElementById('todayLabel').textContent]);
 
   rows.push([H.csvWage, fmtCurrency(toDisplay(WAGE_JPY), currency)]);
@@ -366,24 +389,24 @@ function exportCSV(){
   rows.push([]);
 
   rows.push([H.csvMonthHead[0], H.csvMonthHead[1] + ` (${currency})`, H.csvMonthHead[2]]);
-  let sumJPY=0; 
+  let sumJPY=0;
   for(let m=1;m<=12;m++){
     const d=months[String(m)]||{amountJPY:0,days:0};
-    const monthName = MONTH_NAMES[lang][m-1]; // 月名を言語で出力
+    const monthName = MONTH_NAMES[lang][m-1];
     const amountDisp = Number(toDisplay(d.amountJPY)).toFixed(currency==='USD'?2:0);
-    rows.push([monthName, amountDisp, lang==='ja' ? `${d.days||0}` : `${d.days||0}`]);
-    sumJPY+=d.amountJPY||0; 
+    rows.push([monthName, amountDisp, `${d.days||0}`]);
+    sumJPY+=d.amountJPY||0;
   }
-  rows.push([]); 
+  rows.push([]);
   rows.push([H.csvYear, Number(toDisplay(sumJPY)).toFixed(currency==='USD'?2:0)]);
 
   const csv=rows.map(r=>r.map(x=>{
     const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
   }).join(',')).join('\n');
 
-  const a=document.createElement('a'); 
+  const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download='salary.csv'; 
+  a.download='salary.csv';
   document.body.appendChild(a); a.click(); a.remove();
 }
 
@@ -391,23 +414,23 @@ function exportCSV(){
 function buildDaysOptions(){
   const sel=document.getElementById('daysSelect'); sel.innerHTML='';
   for(let i=0;i<=365;i++){ const opt=document.createElement('option'); opt.value=String(i); opt.textContent=String(i); sel.appendChild(opt); }
-  sel.addEventListener('change',()=>{ days=Number(sel.value); saveState(); renderMain(); buildMonthsGrid(); });
+  sel.addEventListener('change',()=>{ days=clamp(Number(sel.value)||0,0,365); saveState(); renderMain(); buildMonthsGrid(); });
 }
 function buildHoursOptions(){
   const sel=document.getElementById('hoursSelect'); sel.innerHTML='';
-  for(let h=1;h<=24;h++){ 
-    const opt=document.createElement('option'); 
-    opt.value=String(h); 
+  for(let h=1;h<=24;h++){
+    const opt=document.createElement('option');
+    opt.value=String(h);
     opt.textContent=I18N[lang].hoursOpt(h);
-    sel.appendChild(opt); 
+    sel.appendChild(opt);
   }
-  sel.addEventListener('change',()=>{ hours=Number(sel.value); saveState(); renderMain(); buildMonthsGrid(); });
+  sel.addEventListener('change',()=>{ hours=clamp(Number(sel.value)||8,1,24); saveState(); renderMain(); buildMonthsGrid(); });
 }
 function buildStepOptions(){
   const sel=document.getElementById('stepSelect'); sel.innerHTML='';
   // 内部はJPY 900〜10000を100刻みで保持。表示は選択通貨で換算
   for(let v=900; v<=10000; v+=100){
-    const opt=document.createElement('option'); 
+    const opt=document.createElement('option');
     opt.value=String(v); // 内部はJPY
     const disp = toDisplay(v);
     opt.textContent = fmtCurrency(disp, currency);
@@ -455,7 +478,12 @@ document.getElementById('currencySelect').addEventListener('change', e=>{
 });
 document.getElementById('rateApplyBtn').addEventListener('click', ()=>{
   const v = Number(document.getElementById('rateInput').value);
-  if(v>0){ usdJpyRate = v; saveState(); renderTexts(); renderMain(); buildMonthsGrid(); }
+  if(Number.isFinite(v) && v >= 0.01 && v <= 100000){
+    usdJpyRate = v;
+    saveState(); renderTexts(); renderMain(); buildMonthsGrid();
+  }else{
+    alert(I18N[lang].alertRate);
+  }
 });
 
 /* ====== 起動 ====== */
