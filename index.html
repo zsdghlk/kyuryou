@@ -36,7 +36,7 @@
   .month-days{color:#64748b;font-size:13px}
   .btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
 
-  /* 追加: 時給の統合チップ表示 */
+  /* 時給の統合チップ表示 */
   .chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .chip{
     background:#fff;border:1px solid var(--line);padding:6px 10px;border-radius:999px;
@@ -44,6 +44,19 @@
   }
   .chip small{color:var(--muted);font-weight:700;letter-spacing:.02em}
   .chip.active{border-color:var(--act); box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+
+  /* 追加金額：コンパクト行 */
+  .extra-compact{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .btn-icon{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;cursor:pointer}
+  .btn-icon:hover{box-shadow:0 1px 0 rgba(0,0,0,.04)}
+  .btn-icon.minus{border-color:#dbe3f0}
+  .btn-icon.plus{border-color:#dbe3f0}
+  .extra-mini{font-size:13px;color:#0b1020;background:#f7f9fc;border:1px solid var(--line);padding:6px 10px;border-radius:999px}
+  details.step-config{position:relative}
+  details.step-config summary{list-style:none;cursor:pointer;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;user-select:none}
+  details.step-config[open] summary{box-shadow:0 0 0 2px rgba(0,0,0,.05) inset}
+  details.step-config .panel{position:absolute;z-index:2;top:42px;left:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:10px}
+  .step-select{width:160px}
 </style>
 </head>
 <body>
@@ -99,14 +112,21 @@
     <select id="hoursSelect"></select>
   </div>
 
-  <!-- 追加金額（通貨ごとに“切りのいい”ステップ） -->
+  <!-- 追加金額：コンパクト版 -->
   <div class="control-block">
-    <label for="stepSelect" id="extraLabel">追加金額:</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <select id="stepSelect"></select>
-      <button class="plus"  id="plusBtn">＋</button>
-      <button class="minus" id="minusBtn">−</button>
-      <div class="status" id="extraInfo" style="margin-left:6px;font-weight:600;"></div>
+    <label id="extraLabel">追加金額:</label>
+    <div class="extra-compact">
+      <button class="btn-icon minus" id="minusBtn" type="button">−</button>
+      <button class="btn-icon plus" id="plusBtn" type="button">＋ <span id="stepLabel">¥1,000</span></button>
+      <span class="extra-mini" id="extraInfoMini">+ ¥0</span>
+
+      <details class="step-config">
+        <summary>⋯</summary>
+        <div class="panel">
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px" id="stepTitle">ステップを選択</div>
+          <select id="stepSelect" class="step-select"></select>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -179,6 +199,7 @@ const I18N = {
     csvNow: '現在の給料',
     csvMonthHead: ['月','金額','日数'],
     csvYear: '年間合計',
+    stepTitle: 'ステップを選択'
   },
   en: {
     title: 'Salary Calculator',
@@ -206,6 +227,7 @@ const I18N = {
     csvNow: 'Current salary',
     csvMonthHead: ['Month','Amount','Days'],
     csvYear: 'Annual total',
+    stepTitle: 'Choose a step'
   }
 };
 const t = (k)=> I18N[lang][k];
@@ -233,6 +255,16 @@ function renderWageChips(){
     <span class="chip ${currency==='USD'?'active':''}"><small>USD</small> ${fmtCurrencyUSD(wageUSD)}</span>
   `;
 }
+function updateStepLabel(){
+  const el = document.getElementById('stepLabel');
+  if(!el) return;
+  el.textContent = currency==='USD' ? fmtCurrencyUSD(currentStep()) : fmtCurrencyJPY(currentStep());
+}
+function updateExtraMini(){
+  const em = document.getElementById('extraInfoMini');
+  if(!em) return;
+  em.textContent = (lang==='ja' ? '+ ' : '+ ') + fmtCurrency(currentExtra(), currency);
+}
 function renderTexts(){
   document.title = `${t('title')} / Salary Calculator`;
   document.getElementById('title').textContent = t('title');
@@ -248,8 +280,10 @@ function renderTexts(){
   document.getElementById('wageAreaLabel').textContent = t('wageArea');
   document.getElementById('wageJPYLabel').textContent = t('wageJPY');
   document.getElementById('wageUSDLabel').textContent = t('wageUSD');
+  const stepTitle = document.getElementById('stepTitle'); if(stepTitle) stepTitle.textContent = t('stepTitle');
   renderWageChips();
-  document.getElementById('extraInfo').textContent = t('extraInfo')( currentExtra(), currency );
+  updateExtraMini();
+  updateStepLabel();
 }
 function renderMain(){
   document.getElementById('salary').textContent = t('salaryLabel') + fmtCurrency(currentTotal(), currency);
@@ -260,7 +294,8 @@ function renderMain(){
   buildStepOptions();
   document.getElementById('stepSelect').value = String(currentStep());
   renderWageChips();
-  document.getElementById('extraInfo').textContent = t('extraInfo')( currentExtra(), currency );
+  updateExtraMini();
+  updateStepLabel();
 }
 
 /* ====== 金額操作 ====== */
@@ -472,11 +507,12 @@ function buildStepOptions(){
       const opt=document.createElement('option'); opt.value=String(v); opt.textContent=`¥${v}`; sel.appendChild(opt);
     }
   }
-  sel.addEventListener('change',()=>{
+  sel.onchange = ()=>{
     const v = Number(sel.value)|| (currency==='USD'?10:1000);
     if(currency==='USD'){ stepUSD=v; } else { stepJPY=v; }
     saveState(); 
-  });
+    updateStepLabel();
+  };
 }
 
 /* ====== イベント配線 ====== */
